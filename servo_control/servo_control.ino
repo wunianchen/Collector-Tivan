@@ -41,82 +41,60 @@ void setup() {
   R_Motor -> setSpeed(Init_Speed);
   R_Motor -> run(RELEASE);
   // Motor & Servo initialization ends
-
-  // Bluetooth initialization
-  if(!ble.begin(VERBOSE_MODE)){
-    display.println("BLuetooth Init Failed");
-    display.display();  
-  }
-
-  if(FACTORYRESET_ENABLE){
-    if(!ble.factoryReset()){
-      display.println("Bluetooth FaceSet Failed");
-      display.display();  
-    }  
-  }
-  ble.echo(false);
-  ble.info();
-  ble.verbose(false);
-  if(ble.isVersionAtLeast(MINIMUM_FIRMWARE_VERSION)){
-    ble.sendCommandCheckOK("AT+HWModelLED=" MODE_LED_BEHAVIOUR);  
-  }
-  // Bluetooth initialization ends
 }
+
 
 int i;
 
 void loop() {
     while(Serial.available()){
-    	delay(50);
-    	char c=Serial.read();
-    	readString+=c;
+      delay(3);
+    	char c = Serial.read();
+      readString += c;
     }
-      
-    if(readString.length()>0){
-	    Serial.println(readString);
-	  
-	    if (readString =="FORWARD"){
-        Serial.println("I received FORWARD!! ");       
-		    L_Motor -> run(FORWARD);
-			  R_Motor -> run(FORWARD);
-			  L_Motor -> setSpeed(F_Speed);
-			  R_Motor -> setSpeed(F_Speed);  
-	    }
-	    
-	    if (readString =="BACKWARD"){
-		    L_Motor -> run(BACKWARD);
-			  R_Motor -> run(BACKWARD);
-			  L_Motor -> setSpeed(B_Speed);
-			  R_Motor -> setSpeed(B_Speed);  
-	    }
-	
-	    if (readString =="LEFT"){
-		    L_Motor -> run(FORWARD);
-			  R_Motor -> run(FORWARD);
-			  L_Motor -> setSpeed(F_STOP);
-			  R_Motor -> setSpeed(F_Speed);  
-	    }
-	
-	    if (readString =="RIGHT"){
-		    L_Motor -> run(FORWARD);
-			  R_Motor -> run(FORWARD);
-			  L_Motor -> setSpeed(F_Speed);
-			  R_Motor -> setSpeed(F_STOP);  
-	    }
-	
-	    if (readString =="STOP"){
-	      L_Motor -> run (RELEASE);
-	      R_Motor -> run (RELEASE);
-	    }
-	
-	    if (readString == "GRAB"){
-	      grab_servo.write(90);
-	    }
-	
-	    if (readString == "DROP"){
-	      grab_servo.write(175);
-	    }
-	
-	    readString="";
-	} 
+    
+    readString.trim();
+         
+    if (readString == "FORWARD"){
+	    L_Motor -> run(FORWARD);
+		R_Motor -> run(FORWARD);
+		L_Motor -> setSpeed(F_Speed);
+		R_Motor -> setSpeed(F_Speed);  
+    }
+    
+    if (readString =="BACKWARD"){
+	    L_Motor -> run(BACKWARD);
+		R_Motor -> run(BACKWARD);
+		L_Motor -> setSpeed(B_Speed);
+		R_Motor -> setSpeed(B_Speed);  
+    }
+
+    if (readString =="LEFT"){
+	    L_Motor -> run(FORWARD);
+		R_Motor -> run(FORWARD);
+		L_Motor -> setSpeed(F_STOP);
+		R_Motor -> setSpeed(F_Speed);  
+    }
+
+    if (readString =="RIGHT"){
+	    L_Motor -> run(FORWARD);
+		R_Motor -> run(FORWARD);
+		L_Motor -> setSpeed(F_Speed);
+		R_Motor -> setSpeed(F_STOP);  
+    }
+
+    if (readString =="STOP"){
+      L_Motor -> run (RELEASE);
+      R_Motor -> run (RELEASE);
+    }
+
+    if (readString == "GRAB"){
+      grab_servo.write(90);
+    }
+
+    if (readString == "DROP"){
+      grab_servo.write(175);
+    }
+
+    readString="";
 }
