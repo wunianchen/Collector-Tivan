@@ -1,7 +1,11 @@
 #include <Wire.h>
+#include <Servo.h>                                  // include the servo library
 #include <Adafruit_MotorShield.h>                   // include the motor shield library
 #include "utility/Adafruit_MS_PWMServoDriver.h"
-#include <Servo.h>                                  // include the servo library
+#include "Adafruit_BLE.h"
+#include "Adafruit_BluefruitLE_SPI.h"
+#include "Adafruit_BLuefruitLE_UART.h"
+#include "BluefruitConfig.h"
 
 // Create the motor shield object with the default I2C address
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -13,14 +17,18 @@ Servo grab_servo;                                   // define servo name
 
 int Init_Speed = 200;                               // set the initial motor speed
 int F_Speed = 255;                                  // set the forward speed
-int B_Speed = 200;				    // set the backward speed
-int F_STOP = 0;					    // set the stop speed
+int B_Speed = 200;				                          // set the backward speed
+int F_STOP = 0;					                            // set the stop speed
 String readString;                                  // Read data from UART/Bluetooth
+
+// Define bluetooth (SPI) using SCK/MOSI/MISO hardware SPI pins
+Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
 void setup() {
   Serial.begin(9600);
   Serial.println("Collector Tivan Initialization!!!");    // initialization message
 
+  // Motor & Servo initialization
   AFMS.begin();                                           // create with the default frequency 1.6 KHz.
   grab_servo.attach(10);                                  // Digital 10 pin controls the Servo#1 input
   grab_servo.write(175);                                  // Servo motor starting position
@@ -32,6 +40,27 @@ void setup() {
   // Turn on right motor
   R_Motor -> setSpeed(Init_Speed);
   R_Motor -> run(RELEASE);
+  // Motor & Servo initialization ends
+
+  // Bluetooth initialization
+  if(!ble.begin(VERBOSE_MODE)){
+    display.println("BLuetooth Init Failed");
+    display.display();  
+  }
+
+  if(FACTORYRESET_ENABLE){
+    if(!ble.factoryReset()){
+      display.println("Bluetooth FaceSet Failed");
+      display.display();  
+    }  
+  }
+  ble.echo(false);
+  ble.info();
+  ble.verbose(false);
+  if(ble.isVersionAtLeast(MINIMUM_FIRMWARE_VERSION)){
+    ble.sendCommandCheckOK("AT+HWModelLED=" MODE_LED_BEHAVIOUR);  
+  }
+  // Bluetooth initialization ends
 }
 
 int i;
