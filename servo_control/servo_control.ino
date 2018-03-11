@@ -18,15 +18,15 @@
 // Constant for BLE
 #define FACTORYRESET_ENABLE 	1                       // enable this will put BLE in a known good state
 // Constant for servo
-#define SERVO_ATTACH_PIN		10						// digital#10 pin controls servo#1 input
-#define	INIT_SPEED				200                     // set the initial motor speed
-#define	F_SPEED					100                     // set the forward speed
-#define	B_SPEED					200				       	// set the backward speed
-#define	F_STOP					0					    // set the stop speed
-#define	SERVO_RELE_POS			175						// set the servo release position
-#define	SERVO_GRAB_POS			90						// set the servo grab position
+#define SERVO_ATTACH_PIN      10                      // digital#10 pin controls servo#1 input
+#define	INIT_SPEED            200                     // set the initial motor speed
+#define	F_SPEED               100                     // set the forward speed
+#define	B_SPEED               200                     // set the backward speed
+#define	F_STOP                0					              // set the stop speed
+#define	SERVO_RELE_POS        175                     // set the servo release position
+#define	SERVO_GRAB_POS        90                      // set the servo grab position
 // Constant for LIDAR distance sensor
-#define VL6180X_I2C_ADDR		0x29					// the I2C address of distance sensor
+#define VL6180X_I2C_ADDR      0x29                    // the I2C address of distance sensor
 
 // Create the motor shield object with the default I2C address
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
