@@ -1,4 +1,5 @@
 #include <Wire.h>
+#include <SPI.h>
 #include <Servo.h>                                  // include the servo library
 #include <Adafruit_MotorShield.h>                   // include the motor shield library
 #include "utility/Adafruit_MS_PWMServoDriver.h"
@@ -6,6 +7,12 @@
 #include "Adafruit_BluefruitLE_SPI.h"
 #include "Adafruit_BLuefruitLE_UART.h"
 #include "BluefruitConfig.h"
+
+#if SOFTWARE_SERIAL_AVAILABLE
+  #include <SoftwareSerial.h>
+#endif
+
+#define FACTORYRESET_ENABLE 1                       // Enable this will put BLE in a known good state
 
 // Create the motor shield object with the default I2C address
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -16,7 +23,7 @@ Adafruit_DCMotor *R_Motor = AFMS.getMotor(2);       // robot right motor
 Servo grab_servo;                                   // define servo name
 
 int Init_Speed = 200;                               // set the initial motor speed
-int F_Speed = 255;                                  // set the forward speed
+int F_Speed = 100;                                  // set the forward speed
 int B_Speed = 200;				                          // set the backward speed
 int F_STOP = 0;					                            // set the stop speed
 String readString;                                  // Read data from UART/Bluetooth
@@ -25,7 +32,7 @@ String readString;                                  // Read data from UART/Bluet
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.println("Collector Tivan Initialization!!!");    // initialization message
 
   // Motor & Servo initialization
@@ -41,10 +48,38 @@ void setup() {
   R_Motor -> setSpeed(Init_Speed);
   R_Motor -> run(RELEASE);
   // Motor & Servo initialization ends
+
+  Serial.println("Adarduit Bluefruit Initializeation!!!");
+  if(!ble.begin(VERBOSE_MODE))
+  {
+    Serial.println("Couldn't find Bluetooth");  
+  }
+  
+  Serial.println("OK!");
+  
+  if(FACTORYRESET_ENABLE)
+  {
+    Serial.println("Performing a factory reset:");
+    if(!ble.factoryReset())
+    {
+      Serial.println("Couldn't factory reset");  
+    }  
+  }
+
+  ble.echo(false);                                          // Disable command echo from Bluefruit
+  ble.info();                                               // print bluetooth information
+  Serial.println("Wating for a BLE connection to continue...");
+  ble.setMode(BLUEFRUIT_MODE_DATA);
+  ble.verbose(false);                                       // Debug info is a little anoying after this point
+  while(!ble.isConnected())
+  {
+    delay(5000);                                            // Wait for connection to finish  
+  }
+  delay(1000);                                              // Wait for connection to complete
+  Serial.println("CONNECTED!");
+  Serial.println("*************");
+  // Bluetooth Initialization ends
 }
-
-
-int i;
 
 void loop() {
     while(Serial.available()){
