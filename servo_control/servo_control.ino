@@ -1,6 +1,7 @@
-// Header file for motor control
+// Header file for motor control and distance sensor
 #include <Servo.h>                                
-#include <Adafruit_MotorShield.h>                   
+#include <Adafruit_MotorShield.h>
+#include "Adafruit_VL53L0X.h"                   
 #include "utility/Adafruit_MS_PWMServoDriver.h"
 
 // Header file for BLE
@@ -17,6 +18,7 @@
 
 // Constant for BLE
 #define FACTORYRESET_ENABLE 	1                       // enable this will put BLE in a known good state
+
 // Constant for servo
 #define SERVO_ATTACH_PIN      10                      // digital#10 pin controls servo#1 input
 #define	INIT_SPEED            200                     // set the initial motor speed
@@ -25,8 +27,9 @@
 #define	F_STOP                0					              // set the stop speed
 #define	SERVO_RELE_POS        175                     // set the servo release position
 #define	SERVO_GRAB_POS        90                      // set the servo grab position
-// Constant for LIDAR distance sensor
-#define VL6180X_I2C_ADDR      0x29                    // the I2C address of distance sensor
+
+// Create the VL53L0 distance sensor with the default I2C address 0x29
+Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 
 // Create the motor shield object with the default I2C address
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -59,7 +62,7 @@ void setup() {
   R_Motor -> run(RELEASE);
   // Motor & Servo initialization ends
 
-  // Bluetooth initialization
+ /* // Bluetooth initialization
   Serial.println("Adarduit Bluefruit Initializeation!!!");
   if(!ble.begin(VERBOSE_MODE))
   {
@@ -90,9 +93,36 @@ void setup() {
   Serial.println("CONNECTED!");
   Serial.println("*************");
   // Bluetooth Initialization ends
+*/
+
+  // VL53L0 sensor initialization 
+  if(!lox.begin())
+  {
+    Serial.println("Failed to boot VL53L0X");
+    while(1);
+  }
+  Serial.println("VL53L0X Initialization Success!");
 }
 
 void loop() {
+    // Read the distance measure from VL53L0x sensor
+    VL53L0X_RangingMeasurementData_t VL53L0x_measure;
+
+    Serial.print("Reading a measurement...");
+    lox.rangingTest(&VL53L0x_measure, false);               // pass in "true" to get debug data printout
+
+    if(VL53L0x_measure.RangeStatus !=4)
+    {
+      Serial.print("Distance (mm):"); Serial.println(VL53L0x_measure.RangeMilliMeter);  
+    }
+    else
+    {
+      Serial.println("Out of Range!");  
+    }
+    delay(100);
+    
+/*    // Read running measurement from serial port(BLE)
+    // And adjust the motor speed
     while(Serial.available()){
       delay(3);
     	char c = Serial.read();
@@ -102,7 +132,7 @@ void loop() {
     readString.trim();
          
     if (readString == "FORWARD"){
-	    L_Motor -> run(FORWARD);
+		L_Motor -> run(FORWARD);
 		R_Motor -> run(FORWARD);
 		L_Motor -> setSpeed(F_SPEED);
 		R_Motor -> setSpeed(F_SPEED);  
@@ -142,5 +172,5 @@ void loop() {
       grab_servo.write(SERVO_RELE_POS);
     }
 
-    readString="";
+    readString="";*/
 }
