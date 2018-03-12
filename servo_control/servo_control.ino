@@ -1,8 +1,10 @@
-// Header file for motor control and distance sensor
+// Header file for motor control, distance sensor and MPU6050
 #include <Servo.h>                                
 #include <Adafruit_MotorShield.h>
 #include "Adafruit_VL53L0X.h"                   
 #include "utility/Adafruit_MS_PWMServoDriver.h"
+#include "I2Cdev.h"
+#include "MPU6050.h"
 
 // Header file for BLE
 #include <Wire.h>
@@ -27,9 +29,21 @@
 #define	F_STOP                0					              // set the stop speed
 #define	SERVO_RELE_POS        175                     // set the servo release position
 #define	SERVO_GRAB_POS        90                      // set the servo grab position
+#define SERVO_GRAB_DIST_MM    100                     // define the location to grab garbage, currently set 100 mm
+
+// Constant for MPU6050
+#define LED_PIN               13
+#define OUTPUT_READABLE_ACCELGYRO                     // see a tab-separated list of acc X/Y/Z and gyo X/Y/Z in dec
+//#define OUTPUT_BINARY_ACCELGYRO                     // much faster than UART, hard to read
+
+// Define bluetooth (SPI) using SCK/MOSI/MISO hardware SPI pins
+Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
 // Create the VL53L0 distance sensor with the default I2C address 0x29
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
+
+// Create the MPU6050 with the defualt I2C address 0x68
+MPU6050 accelgyro;
 
 // Create the motor shield object with the default I2C address
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -40,9 +54,9 @@ Adafruit_DCMotor *R_Motor = AFMS.getMotor(2);       	// robot right motor
 Servo grab_servo;                                   	// define servo name
 
 String readString;                                  	// Read data from UART/Bluetooth
-
-// Define bluetooth (SPI) using SCK/MOSI/MISO hardware SPI pins
-Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
+int16_t ax, ay, az;                                   // Coordinator used by MPU 6050
+int16_t gx, gy, gz;
+bool blinkState = false;
 
 void setup() {
   Serial.begin(115200);
@@ -102,6 +116,22 @@ void setup() {
     while(1);
   }
   Serial.println("VL53L0X Initialization Success!");
+  // VL53L0 sensor initialzation ends
+
+  // MPU6050 sensor initialization
+  // We have to join I2C bus first because I2C library doesn't do this
+  #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
+      Wire.begin();
+  #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
+      Fastwire::setup(400, true);
+  #endif  
+
+  Serial.println("Initializing I2C devices...");
+  accelgyro.initialize();
+  Serial.println("Testing device connections...");
+  Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
+
+  pinMode(LED_PIN, OUTPUT);
 }
 
 void loop() {
@@ -120,6 +150,37 @@ void loop() {
       Serial.println("Out of Range!");  
     }
     delay(100);
+
+    // read raw accel/gyro measurements from device
+    accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+
+    // these methods (and a few others) are also available
+    //accelgyro.getAcceleration(&ax, &ay, &az);
+    //accelgyro.getRotation(&gx, &gy, &gz);
+
+    #ifdef OUTPUT_READABLE_ACCELGYRO
+        // display tab-separated accel/gyro x/y/z values
+        Serial.print("a/g:\t");
+        Serial.print(ax); Serial.print("\t");
+        Serial.print(ay); Serial.print("\t");
+        Serial.print(az); Serial.print("\t");
+        Serial.print(gx); Serial.print("\t");
+        Serial.print(gy); Serial.print("\t");
+        Serial.println(gz);
+    #endif
+
+    #ifdef OUTPUT_BINARY_ACCELGYRO
+        Serial.write((uint8_t)(ax >> 8)); Serial.write((uint8_t)(ax & 0xFF));
+        Serial.write((uint8_t)(ay >> 8)); Serial.write((uint8_t)(ay & 0xFF));
+        Serial.write((uint8_t)(az >> 8)); Serial.write((uint8_t)(az & 0xFF));
+        Serial.write((uint8_t)(gx >> 8)); Serial.write((uint8_t)(gx & 0xFF));
+        Serial.write((uint8_t)(gy >> 8)); Serial.write((uint8_t)(gy & 0xFF));
+        Serial.write((uint8_t)(gz >> 8)); Serial.write((uint8_t)(gz & 0xFF));
+    #endif
+
+    // blink LED to indicate activity
+    blinkState = !blinkState;
+    digitalWrite(LED_PIN, blinkState);
     
 /*    // Read running measurement from serial port(BLE)
     // And adjust the motor speed
