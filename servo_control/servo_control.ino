@@ -149,7 +149,7 @@ void loop() {
     {
       Serial.println("Out of Range!");  
     }
-    delay(100);
+    delay(1000); 
 
     // read raw accel/gyro measurements from device
     accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
@@ -167,6 +167,7 @@ void loop() {
         Serial.print(gx); Serial.print("\t");
         Serial.print(gy); Serial.print("\t");
         Serial.println(gz);
+        delay(1000);
     #endif
 
     #ifdef OUTPUT_BINARY_ACCELGYRO
@@ -182,7 +183,7 @@ void loop() {
     blinkState = !blinkState;
     digitalWrite(LED_PIN, blinkState);
     
-/*    // Read running measurement from serial port(BLE)
+    // Read running measurement from serial port(BLE)
     // And adjust the motor speed
     while(Serial.available()){
       delay(3);
@@ -225,13 +226,15 @@ void loop() {
       R_Motor -> run (RELEASE);
     }
 
-    if (readString == "GRAB"){
-      grab_servo.write(SERVO_GRAB_POS);
+    if (VL53L0x_measure.RangeMilliMeter < 100){                // When the distance between sensor and grab stuff
+      grab_servo.write(SERVO_GRAB_POS);                       // smaller than 30, grab the stuff.
+      delay(2000);
+      grab_servo.write(SERVO_RELE_POS);
     }
 
     if (readString == "DROP"){
       grab_servo.write(SERVO_RELE_POS);
     }
 
-    readString="";*/
+    readString="";
 }
