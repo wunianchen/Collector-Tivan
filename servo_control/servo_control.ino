@@ -31,9 +31,14 @@
 
 // Constant for MPU6050
 #define MPU_I2C_ADDR          0x68                    // MPU6050 I2C Address from datasheet
-#define REQ_BYTES_LEN         14                      // the length of bytes once read from MPU6050
-#define MPU_MIN_VAL           265                     // MPU6050 minimum value
-#define MPU_MAX_VAL           402                     // MPU6050 maximum value
+#define PWR_MGMT_ADDR         0x6B                    // power management register, required as start reg at MPU activation
+#define PWR_MGMT_DATA         0x00                    // the data that set in MPU6050
+#define ACCEL_CONFIG_ADDR     0x1C                    // acclerator configuration register address
+#define ACCEL_CONFIG_DATA     0x10                    // configure the acclerator(+/-8g)
+#define GYRO_CONFIG_ADDR      0x1B                    // gyro configuration register address
+#define GYRO_CONFIG_DATA      0x08                    // configure the gyro(500dps as full scale)
+#define ACCEL_XOUT_H_ADDR     0x3B                    // the address for ACCEL_XOUT_H reg, which is the start point of read
+#define REQ_BYTES_LEN         14                      // the length of bytes once read from MPU6050 (from 3B to 48)
 
 // Define bluetooth (SPI) using SCK/MOSI/MISO hardware SPI pins
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
@@ -44,15 +49,28 @@ Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 // Create the motor shield object with the default I2C address
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 
-//Connect the two DC motor to port M1 & M2
+// Connect the two DC motor to port M1 & M2
 Adafruit_DCMotor *L_Motor = AFMS.getMotor(1);       	  // robot left motor
 Adafruit_DCMotor *R_Motor = AFMS.getMotor(2);       	  // robot right motor
 Servo grab_servo;                                   	  // define servo name
 
+// Variable used for UART/Bluetooth
 String readString;                                  	  // Read data from UART/Bluetooth
-int16_t AcX, AcY, AcZ;                                  // Acclerator value in MPU 6050
-int16_t GyX, GyY, GyZ;                                  // Gyro value in MPU 6050
-double Angle_X_Deg, Angle_Y_Deg, Angle_Z_Deg;           // the final angle value on each axis                                      
+
+// Variable for MPU6050
+bool set_gyro_angles;
+int gyro_X, gyro_Y, gyro_Z;                             // Gyro raw value in MPU 6050
+long gyro_X_cal, gyro_Y_cal, gyro_Z_cal;                // Gyro calibration value
+
+long acc_X, acc_Y, acc_Z, acc_total_vector;             // Acclerator raw value in MPU 6050
+float angle_roll_acc, angle_pitch_acc;
+
+float angle_pitch, angle_roll;
+int angle_pitch_buffer, angle_roll_buffer;
+float angle_pitch_output, angle_roll_output;
+
+long loop_timer;
+int temp;                                     
 
 void setup() {
   Serial.begin(115200);
@@ -116,10 +134,40 @@ void setup() {
 
   // MPU6050 initialization
   Wire.begin();
+  
+  // Activate the MPU6050
   Wire.beginTransmission(MPU_I2C_ADDR);
-  Wire.write(0x6B);
-  Wire.write(0);
-  Wire.endTransmission(true);
+  Wire.write(PWR_MGMT_ADDR);
+  Wire.write(PWR_MGMT_DATA);
+  Wire.endTransmission();
+  
+  // Configure the acclerometer
+  Wire.beginTransmission(MPU_I2C_ADDR);
+  Wire.write(ACCEL_CONFIG_ADDR);
+  Wire.write(ACCEL_CONFIG_DATA);
+  Wire.endTransmission(); 
+  
+  // Configure the gyro
+  Wire.beginTransmission(MPU_I2C_ADDR);
+  Wire.write(GYRO_CONFIG_ADDR);
+  Wire.write(GYRO_CONFIG_DATA);
+  Wire.endTransmission(); 
+
+  // MPU6050 Calibration
+  for(int cal_int = 0; cal_int < 1000; cal_int++)
+  {
+    read_MPU_6050_data();                                 // read raw data from MPU6050
+    gyro_X_cal += gyro_X;                                 // add the gyro x offset to the gyro_X_cal variable
+    gyro_Y_cal += gyro_Y;                                 // add the gyro y offset to the gyro_Y_cal variable
+    gyro_Z_cal += gyro_Z;                                 // add the gyro z offset to the gyro_Z_cal variable
+    delay(3);                                             // delay 3ms to have 250Hz for-loop. TODO: might change here.
+  }
+
+  // get the average offset
+  gyro_X_cal /= 1000;
+  gyro_Y_cal /= 1000;
+  gyro_Z_cal /= 1000;
+  loop_timer = micros();
   // MPU6050 initialization ends
 }
 
@@ -141,34 +189,53 @@ void loop() {
     delay(1000); 
 */
 
-    // Reading data (in degree) from MPU6050
-    Wire.beginTransmission(MPU_I2C_ADDR);
-    Wire.write(0x3B);                                       // TODO: parameterize these instruction
-    Wire.endTransmission(false);
-    Wire.requestFrom(MPU_I2C_ADDR, REQ_BYTES_LEN, true);   
-    AcX = Wire.read()<<8|Wire.read();
-    AcY = Wire.read()<<8|Wire.read();   
-    AcZ = Wire.read()<<8|Wire.read();
+  // Read data from MPU6050
+  read_MPU_6050_data();                                    // Read the raw data from MPU6050
+  
+  //Subtract the offset values from the raw gyro values
+  gyro_X -= gyro_X_cal;                                                
+  gyro_Y -= gyro_Y_cal;                                                
+  gyro_Z -= gyro_Z_cal;                                                
+         
+  //Gyro angle calculations . Note 0.0000611 = 1 / (250Hz x 65.5)
+  angle_pitch += gyro_X * 0.0000611;                                   //Calculate the traveled pitch angle and add this to the angle_pitch variable
+  angle_roll += gyro_Y * 0.0000611;                                    //Calculate the traveled roll angle and add this to the angle_roll variable
+  
+  //0.000001066 = 0.0000611 * (3.142(PI) / 180degr) The Arduino sin function is in radians
+  angle_pitch += angle_roll * sin(gyro_Z * 0.000001066);               //If the IMU has yawed transfer the roll angle to the pitch angel
+  angle_roll -= angle_pitch * sin(gyro_Z * 0.000001066);               //If the IMU has yawed transfer the pitch angle to the roll angel
+  
+  //Accelerometer angle calculations
+  acc_total_vector = sqrt((acc_X*acc_X)+(acc_Y*acc_Y)+(acc_Z*acc_Z));  //Calculate the total accelerometer vector
+  
+  //57.296 = 1 / (3.142 / 180) The Arduino asin function is in radians
+  angle_pitch_acc = asin((float)acc_Y/acc_total_vector)* 57.296;       //Calculate the pitch angle
+  angle_roll_acc = asin((float)acc_X/acc_total_vector)* -57.296;       //Calculate the roll angle
+  
+  angle_pitch_acc -= 0.0;                                              //Accelerometer calibration value for pitch
+  angle_roll_acc -= 0.0;                                               //Accelerometer calibration value for roll
 
-    int xAng = map(AcX, MPU_MIN_VAL, MPU_MAX_VAL, -90, 90);
-    int yAng = map(AcY, MPU_MIN_VAL, MPU_MAX_VAL, -90, 90);
-    int zAng = map(AcZ, MPU_MIN_VAL, MPU_MAX_VAL, -90, 90);
+  if(set_gyro_angles)                                                  //If the IMU is already started
+  {
+    angle_pitch = angle_pitch * 0.9996 + angle_pitch_acc * 0.0004;     //Correct the drift of the gyro pitch angle with the accelerometer pitch angle
+    angle_roll = angle_roll * 0.9996 + angle_roll_acc * 0.0004;        //Correct the drift of the gyro roll angle with the accelerometer roll angle
+  }
+  else
+  {                                                                    //At first start
+    angle_pitch = angle_pitch_acc;                                     //Set the gyro pitch angle equal to the accelerometer pitch angle 
+    angle_roll = angle_roll_acc;                                       //Set the gyro roll angle equal to the accelerometer roll angle 
+    set_gyro_angles = true;                                            //Set the IMU started flag
+  }
+  
+  //To dampen the pitch and roll angles a complementary filter is used
+  angle_pitch_output = angle_pitch_output * 0.9 + angle_pitch * 0.1;   //Take 90% of the output pitch value and add 10% of the raw pitch value
+  angle_roll_output = angle_roll_output * 0.9 + angle_roll * 0.1;      //Take 90% of the output roll value and add 10% of the raw roll value
+  Serial.print(" | Pitch_Angle  = "); Serial.println(angle_pitch_output);
+  Serial.print(" | Roll_Angle  = ");  Serial.println(angle_roll_output);
 
-    Angle_X_Deg = RAD_TO_DEG * (atan2(-yAng, -zAng)+PI);
-    Angle_Y_Deg = RAD_TO_DEG * (atan2(-xAng, -zAng)+PI);
-    Angle_Z_Deg = RAD_TO_DEG * (atan2(-yAng, -xAng)+PI);
-
-    Serial.print("Angle_X = ");
-    Serial.println(Angle_X_Deg);
-
-    Serial.print("Angle_Y = ");
-    Serial.println(Angle_Y_Deg);
-
-    Serial.print("Angle_Z = ");
-    Serial.println(Angle_Z_Deg);
-    Serial.println("------------------------------------------------------");
-    delay(500);
-
+ while(micros() - loop_timer < 4000);                                 //Wait until the loop_timer reaches 4000us (250Hz) before starting the next loop
+ loop_timer = micros();                                               // reset the loop timer
+  
 /*    // Read running measurement from serial port(BLE)
     // And adjust the motor speed
     while(Serial.available()){
@@ -223,4 +290,23 @@ void loop() {
     }
 
     readString="";*/
+}
+
+void read_MPU_6050_data()
+{
+    // Reading raw data from MPU6050
+    Wire.beginTransmission(MPU_I2C_ADDR);
+    Wire.write(ACCEL_XOUT_H_ADDR);                                       
+    Wire.endTransmission();
+    Wire.requestFrom(MPU_I2C_ADDR, REQ_BYTES_LEN);
+
+    // Based on register mapping, read 14 byes data one by one
+    while(Wire.available() < REQ_BYTES_LEN);
+    acc_X = Wire.read()<<8|Wire.read();
+    acc_Y = Wire.read()<<8|Wire.read();   
+    acc_Z = Wire.read()<<8|Wire.read();
+    temp  = Wire.read()<<8|Wire.read();
+    gyro_X = Wire.read()<<8|Wire.read();
+    gyro_Y = Wire.read()<<8|Wire.read();   
+    gyro_Z = Wire.read()<<8|Wire.read();
 }
