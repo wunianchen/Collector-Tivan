@@ -1,10 +1,8 @@
-// Header file for motor control, distance sensor and MPU6050
+// Header file for motor control and distance sensor
 #include <Servo.h>                                
 #include <Adafruit_MotorShield.h>
 #include "Adafruit_VL53L0X.h"                   
 #include "utility/Adafruit_MS_PWMServoDriver.h"
-#include "I2Cdev.h"
-#include "MPU6050.h"
 
 // Header file for BLE
 #include <Wire.h>
@@ -32,9 +30,10 @@
 #define SERVO_GRAB_DIST_MM    100                     // define the location to grab garbage, currently set 100 mm
 
 // Constant for MPU6050
-#define LED_PIN               13
-#define OUTPUT_READABLE_ACCELGYRO                     // see a tab-separated list of acc X/Y/Z and gyo X/Y/Z in dec
-//#define OUTPUT_BINARY_ACCELGYRO                     // much faster than UART, hard to read
+#define MPU_I2C_ADDR          0x68                    // MPU6050 I2C Address from datasheet
+#define REQ_BYTES_LEN         14                      // the length of bytes once read from MPU6050
+#define MPU_MIN_VAL           265                     // MPU6050 minimum value
+#define MPU_MAX_VAL           402                     // MPU6050 maximum value
 
 // Define bluetooth (SPI) using SCK/MOSI/MISO hardware SPI pins
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
@@ -42,21 +41,18 @@ Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_
 // Create the VL53L0 distance sensor with the default I2C address 0x29
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 
-// Create the MPU6050 with the defualt I2C address 0x68
-MPU6050 accelgyro;
-
 // Create the motor shield object with the default I2C address
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 
 //Connect the two DC motor to port M1 & M2
-Adafruit_DCMotor *L_Motor = AFMS.getMotor(1);       	// robot left motor
-Adafruit_DCMotor *R_Motor = AFMS.getMotor(2);       	// robot right motor
-Servo grab_servo;                                   	// define servo name
+Adafruit_DCMotor *L_Motor = AFMS.getMotor(1);       	  // robot left motor
+Adafruit_DCMotor *R_Motor = AFMS.getMotor(2);       	  // robot right motor
+Servo grab_servo;                                   	  // define servo name
 
-String readString;                                  	// Read data from UART/Bluetooth
-int16_t ax, ay, az;                                   // Coordinator used by MPU 6050
-int16_t gx, gy, gz;
-bool blinkState = false;
+String readString;                                  	  // Read data from UART/Bluetooth
+int16_t AcX, AcY, AcZ;                                  // Acclerator value in MPU 6050
+int16_t GyX, GyY, GyZ;                                  // Gyro value in MPU 6050
+double Angle_X_Deg, Angle_Y_Deg, Angle_Z_Deg;           // the final angle value on each axis                                      
 
 void setup() {
   Serial.begin(115200);
@@ -118,24 +114,17 @@ void setup() {
   Serial.println("VL53L0X Initialization Success!");
   // VL53L0 sensor initialzation ends
 
-  // MPU6050 sensor initialization
-  // We have to join I2C bus first because I2C library doesn't do this
-  #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
-      Wire.begin();
-  #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
-      Fastwire::setup(400, true);
-  #endif  
-
-  Serial.println("Initializing I2C devices...");
-  accelgyro.initialize();
-  Serial.println("Testing device connections...");
-  Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
-
-  pinMode(LED_PIN, OUTPUT);
+  // MPU6050 initialization
+  Wire.begin();
+  Wire.beginTransmission(MPU_I2C_ADDR);
+  Wire.write(0x6B);
+  Wire.write(0);
+  Wire.endTransmission(true);
+  // MPU6050 initialization ends
 }
 
 void loop() {
-    // Read the distance measure from VL53L0x sensor
+/*    // Read the distance measure from VL53L0x sensor
     VL53L0X_RangingMeasurementData_t VL53L0x_measure;
 
     Serial.print("Reading a measurement...");
@@ -150,40 +139,37 @@ void loop() {
       Serial.println("Out of Range!");  
     }
     delay(1000); 
+*/
 
-    // read raw accel/gyro measurements from device
-    accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+    // Reading data (in degree) from MPU6050
+    Wire.beginTransmission(MPU_I2C_ADDR);
+    Wire.write(0x3B);                                       // TODO: parameterize these instruction
+    Wire.endTransmission(false);
+    Wire.requestFrom(MPU_I2C_ADDR, REQ_BYTES_LEN, true);   
+    AcX = Wire.read()<<8|Wire.read();
+    AcY = Wire.read()<<8|Wire.read();   
+    AcZ = Wire.read()<<8|Wire.read();
 
-    // these methods (and a few others) are also available
-    //accelgyro.getAcceleration(&ax, &ay, &az);
-    //accelgyro.getRotation(&gx, &gy, &gz);
+    int xAng = map(AcX, MPU_MIN_VAL, MPU_MAX_VAL, -90, 90);
+    int yAng = map(AcY, MPU_MIN_VAL, MPU_MAX_VAL, -90, 90);
+    int zAng = map(AcZ, MPU_MIN_VAL, MPU_MAX_VAL, -90, 90);
 
-    #ifdef OUTPUT_READABLE_ACCELGYRO
-        // display tab-separated accel/gyro x/y/z values
-        Serial.print("a/g:\t");
-        Serial.print(ax); Serial.print("\t");
-        Serial.print(ay); Serial.print("\t");
-        Serial.print(az); Serial.print("\t");
-        Serial.print(gx); Serial.print("\t");
-        Serial.print(gy); Serial.print("\t");
-        Serial.println(gz);
-        delay(1000);
-    #endif
+    Angle_X_Deg = RAD_TO_DEG * (atan2(-yAng, -zAng)+PI);
+    Angle_Y_Deg = RAD_TO_DEG * (atan2(-xAng, -zAng)+PI);
+    Angle_Z_Deg = RAD_TO_DEG * (atan2(-yAng, -xAng)+PI);
 
-    #ifdef OUTPUT_BINARY_ACCELGYRO
-        Serial.write((uint8_t)(ax >> 8)); Serial.write((uint8_t)(ax & 0xFF));
-        Serial.write((uint8_t)(ay >> 8)); Serial.write((uint8_t)(ay & 0xFF));
-        Serial.write((uint8_t)(az >> 8)); Serial.write((uint8_t)(az & 0xFF));
-        Serial.write((uint8_t)(gx >> 8)); Serial.write((uint8_t)(gx & 0xFF));
-        Serial.write((uint8_t)(gy >> 8)); Serial.write((uint8_t)(gy & 0xFF));
-        Serial.write((uint8_t)(gz >> 8)); Serial.write((uint8_t)(gz & 0xFF));
-    #endif
+    Serial.print("Angle_X = ");
+    Serial.println(Angle_X_Deg);
 
-    // blink LED to indicate activity
-    blinkState = !blinkState;
-    digitalWrite(LED_PIN, blinkState);
-    
-    // Read running measurement from serial port(BLE)
+    Serial.print("Angle_Y = ");
+    Serial.println(Angle_Y_Deg);
+
+    Serial.print("Angle_Z = ");
+    Serial.println(Angle_Z_Deg);
+    Serial.println("------------------------------------------------------");
+    delay(500);
+
+/*    // Read running measurement from serial port(BLE)
     // And adjust the motor speed
     while(Serial.available()){
       delay(3);
@@ -228,13 +214,13 @@ void loop() {
 
     if (VL53L0x_measure.RangeMilliMeter < 100){                // When the distance between sensor and grab stuff
       grab_servo.write(SERVO_GRAB_POS);                       // smaller than 30, grab the stuff.
-      delay(2000);
-      grab_servo.write(SERVO_RELE_POS);
+//      delay(2000);
+//      grab_servo.write(SERVO_RELE_POS);
     }
 
     if (readString == "DROP"){
       grab_servo.write(SERVO_RELE_POS);
     }
 
-    readString="";
+    readString="";*/
 }
