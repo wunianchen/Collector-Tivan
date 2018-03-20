@@ -1,4 +1,4 @@
- import cv2
+import cv2
 import sys
 import numpy as np
 import bm
@@ -7,7 +7,7 @@ import pickle
 # define video capture object
 
 camL = cv2.VideoCapture(0);
-camR = cv2.VideoCapture(2);
+camR = cv2.VideoCapture(1);
 
 # define display window names
 
@@ -52,25 +52,25 @@ while (keep_processing):
     ret, frameL = camL.retrieve();
     ret, frameR = camR.retrieve();
     
+    # undistort and rectify based on the mappings (could improve interpolation and image border settings here)
+    # N.B. mapping works independant of number of image channels
+
+    undistorted_rectifiedL = cv2.remap(frameL, mapL1, mapL2, cv2.INTER_LINEAR);
+    undistorted_rectifiedR = cv2.remap(frameR, mapR1, mapR2, cv2.INTER_LINEAR);
     # remember to convert to grayscale (as the disparity matching works on grayscale)
 
-    grayL = cv2.cvtColor(frameL,cv2.COLOR_BGR2GRAY);
-    grayR = cv2.cvtColor(frameR,cv2.COLOR_BGR2GRAY);
-
+    grayL = cv2.cvtColor(undistorted_rectifiedL,cv2.COLOR_BGR2GRAY);
+    grayR = cv2.cvtColor(undistorted_rectifiedR,cv2.COLOR_BGR2GRAY);
 
     track_window = cv2.selectROI(grayL, False)
     c,r,w,h      = track_window
     print(track_window)
     
     # set up the ROI for tracking
-    roi = grayL[r:r+h, c:c+w]
-    grayL = np.zeros(grayL.shape)
-    grayL[r:r+h, c:c+w] = roi
-    # undistort and rectify based on the mappings (could improve interpolation and image border settings here)
-    # N.B. mapping works independant of number of image channels
+    im0 = grayL[r:r+h, c:c+w]
+    im1 = grayR[r:r+h, c:c+w]
 
-    undistorted_rectifiedL = cv2.remap(grayL, mapL1, mapL2, cv2.INTER_LINEAR);
-    undistorted_rectifiedR = cv2.remap(grayR, mapR1, mapR2, cv2.INTER_LINEAR);
+    #vis2 = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
 
     # compute disparity image from undistorted and rectified versions
     # (which for reasons best known to the OpenCV developers is returned scaled by 16)
@@ -82,7 +82,7 @@ while (keep_processing):
 
     disparity_scaled = (disparity / 16.).astype(np.uint8) + abs(disparity.min())
     '''
-    disparity_scaled = bm.disp_bm(undistorted_rectifiedL,undistorted_rectifiedR)
+    disparity_scaled = bm.disp_bm(im0, im1)
     # display image
     #count = count + 1
 
