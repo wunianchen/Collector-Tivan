@@ -2,12 +2,13 @@ import cv2
 import sys
 import numpy as np
 import bm
+import sgbm
 import pickle
 
 # define video capture object
 
 camL = cv2.VideoCapture(0);
-camR = cv2.VideoCapture(1);
+camR = cv2.VideoCapture(2);
 
 # define display window names
 
@@ -61,7 +62,7 @@ while (keep_processing):
 
     grayL = cv2.cvtColor(undistorted_rectifiedL,cv2.COLOR_BGR2GRAY);
     grayR = cv2.cvtColor(undistorted_rectifiedR,cv2.COLOR_BGR2GRAY);
-
+    '''
     track_window = cv2.selectROI(grayL, False)
     c,r,w,h      = track_window
     print(track_window)
@@ -69,7 +70,7 @@ while (keep_processing):
     # set up the ROI for tracking
     im0 = grayL[r:r+h, c:c+w]
     im1 = grayR[r:r+h, c:c+w]
-
+    '''
     #vis2 = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
 
     # compute disparity image from undistorted and rectified versions
@@ -82,7 +83,9 @@ while (keep_processing):
 
     disparity_scaled = (disparity / 16.).astype(np.uint8) + abs(disparity.min())
     '''
-    disparity_scaled = bm.disp_bm(im0, im1)
+    #disparity_scaled = bm.disp_bm(im0, im1)
+    #disparity_scaled = bm.disp_bm(grayL, grayR)
+    disparity_scaled = sgbm.disp_sgbm(undistorted_rectifiedL, undistorted_rectifiedR)
     # display image
     #count = count + 1
 
