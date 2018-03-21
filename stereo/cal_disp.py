@@ -7,7 +7,7 @@ import pickle
 
 # define video capture object
 
-camL = cv2.VideoCapture(0);
+camL = cv2.VideoCapture(1);
 camR = cv2.VideoCapture(2);
 
 # define display window names
@@ -39,6 +39,10 @@ f2.close()
 f3 = open('mapR2.pckl','rb')
 mapR2 = pickle.load(f3)
 f3.close()
+
+f4 = open('q.pckl','rb')
+Q = pickle.load(f4)
+f4.close()
 
 while (keep_processing):
 
@@ -84,10 +88,23 @@ while (keep_processing):
     disparity_scaled = (disparity / 16.).astype(np.uint8) + abs(disparity.min())
     '''
     #disparity_scaled = bm.disp_bm(im0, im1)
-    #disparity_scaled = bm.disp_bm(grayL, grayR)
-    disparity_scaled = sgbm.disp_sgbm(undistorted_rectifiedL, undistorted_rectifiedR)
+    disparity_scaled = bm.disp_bm(grayL, grayR)
+    #disparity_scaled = sgbm.disp_sgbm(undistorted_rectifiedL, undistorted_rectifiedR)
     # display image
     #count = count + 1
+    track_window = cv2.selectROI(undistorted_rectifiedL, False)
+    c,r,w,h      = track_window
+
+    points = cv2.reprojectImageTo3D(disparity_scaled[r:r+h, c:c+w], Q)
+    
+    # set up the ROI for tracking
+    #im0 = grayL[r:r+h, :]
+    #im1 = grayR[r:r+h, :]
+    
+    coor = np.mean(np.mean(points, axis=0), axis=0)
+    print(np.degrees(np.arctan2(coor[1], coor[0])))
+    print(np.linalg.norm([coor[0], coor[1]]))
+
 
     cv2.imshow(windowNameL,undistorted_rectifiedL);
     cv2.imshow(windowNameR,undistorted_rectifiedR);
