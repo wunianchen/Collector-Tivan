@@ -7,7 +7,7 @@ import pickle
 
 # define video capture object
 
-camL = cv2.VideoCapture(1);
+camL = cv2.VideoCapture(0);
 camR = cv2.VideoCapture(2);
 
 # define display window names
@@ -44,6 +44,7 @@ f4 = open('q.pckl','rb')
 Q = pickle.load(f4)
 f4.close()
 
+
 while (keep_processing):
 
     # grab frames from camera (to ensure best time sync.)
@@ -56,12 +57,14 @@ while (keep_processing):
 
     ret, frameL = camL.retrieve();
     ret, frameR = camR.retrieve();
+    print(frameL.shape)
     
     # undistort and rectify based on the mappings (could improve interpolation and image border settings here)
     # N.B. mapping works independant of number of image channels
 
     undistorted_rectifiedL = cv2.remap(frameL, mapL1, mapL2, cv2.INTER_LINEAR);
     undistorted_rectifiedR = cv2.remap(frameR, mapR1, mapR2, cv2.INTER_LINEAR);
+    print(undistorted_rectifiedL.shape)
     # remember to convert to grayscale (as the disparity matching works on grayscale)
 
     grayL = cv2.cvtColor(undistorted_rectifiedL,cv2.COLOR_BGR2GRAY);
@@ -96,6 +99,7 @@ while (keep_processing):
     c,r,w,h      = track_window
 
     points = cv2.reprojectImageTo3D(disparity_scaled[r:r+h, c:c+w], Q)
+    print(points)
     
     # set up the ROI for tracking
     #im0 = grayL[r:r+h, :]
