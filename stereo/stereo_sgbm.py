@@ -75,6 +75,8 @@ if ((camL.open(camera_to_use)) and (camR.open(camera_to_use + 2))):
         ret, frameL = camL.retrieve();
         ret, frameR = camR.retrieve();
 
+        frameL = cv2.resize(frameL, (640, 480))
+        frameR = cv2.resize(frameR, (640, 480))
         # display image
         
         cv2.imshow(windowNameL,frameL);
@@ -147,6 +149,11 @@ while (not(do_calibration)):
 
         retR, frameL = camL.retrieve();
         retL, frameR = camR.retrieve();
+        
+        frameL = cv2.resize(frameL, (640, 480))
+        frameR = cv2.resize(frameR, (640, 480))
+        
+        
 
         # convert to grayscale
 
@@ -227,6 +234,9 @@ while (keep_processing):
 
     ret, frameL = camL.retrieve();
     ret, frameR = camR.retrieve();
+    
+    frameL = cv2.resize(frameL, (640, 480))
+    frameR = cv2.resize(frameR, (640, 480))
 
     undistortedL = cv2.undistort(frameL, mtxL, distL, None, None)
     undistortedR = cv2.undistort(frameR, mtxR, distR, None, None)
@@ -290,7 +300,7 @@ print("STEREO: RMS left to  right re-projection error: ", rms_stereo)
 # that the rectified image is decimated and shifted so that all the pixels from the original images
 # from the cameras are retained in the rectified images (no source image pixels are lost)." - ?
 
-RL, RR, PL, PR, _, _, _ = cv2.stereoRectify(camera_matrix_l, dist_coeffs_l, camera_matrix_r, dist_coeffs_r,  grayL.shape[::-1], R, T, alpha=-1);
+RL, RR, PL, PR, Q, _, _ = cv2.stereoRectify(camera_matrix_l, dist_coeffs_l, camera_matrix_r, dist_coeffs_r,  grayL.shape[::-1], R, T, alpha=-1);
 
 # compute the pixel mappings to the rectified versions of the images
 
@@ -313,6 +323,12 @@ f3 = open('mapR2.pckl','wb')
 pickle.dump(mapR2,f3)
 f3.close()
 
+f4 = open('q.pckl','wb')
+pickle.dump(Q,f4)
+f4.close()
+
+print(Q)
+
 print()
 print("-> performing rectification")
 
@@ -330,6 +346,9 @@ while (keep_processing):
 
     ret, frameL = camL.retrieve();
     ret, frameR = camR.retrieve();
+    
+    frameL = cv2.resize(frameL, (640, 480))
+    frameR = cv2.resize(frameR, (640, 480))
 
     # undistort and rectify based on the mappings (could improve interpolation and image border settings here)
 
@@ -391,6 +410,9 @@ while (keep_processing):
 
     ret, frameL = camL.retrieve();
     ret, frameR = camR.retrieve();
+    
+    frameL = cv2.resize(frameL, (640, 480))
+    frameR = cv2.resize(frameR, (640, 480))
 
     # remember to convert to grayscale (as the disparity matching works on grayscale)
 
