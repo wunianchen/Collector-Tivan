@@ -7,8 +7,8 @@ import pickle
 
 # define video capture object
 
-camL = cv2.VideoCapture(0);
-camR = cv2.VideoCapture(2);
+camR = cv2.VideoCapture(0);
+camL = cv2.VideoCapture(1);
 
 # define display window names
 
@@ -44,11 +44,7 @@ f4 = open('q.pckl','rb')
 Q = pickle.load(f4)
 f4.close()
 
-
-while (keep_processing):
-
-    # grab frames from camera (to ensure best time sync.)
-
+for i in range(20):
     camL.grab();
     camR.grab();
 
@@ -57,74 +53,138 @@ while (keep_processing):
 
     ret, frameL = camL.retrieve();
     ret, frameR = camR.retrieve();
-    print(frameL.shape)
     
+while (keep_processing):
+    # ===========================0
+    # grab frames from camera (to ensure best time sync.)
+    camL.grab();
+    camR.grab();
+
+    # then retrieve the images in slow(er) time
+    # (do not be tempted to use read() !)
+
+    ret, frameL = camL.retrieve();
+    ret, frameR = camR.retrieve();
+        
     # undistort and rectify based on the mappings (could improve interpolation and image border settings here)
     # N.B. mapping works independant of number of image channels
 
     undistorted_rectifiedL = cv2.remap(frameL, mapL1, mapL2, cv2.INTER_LINEAR);
     undistorted_rectifiedR = cv2.remap(frameR, mapR1, mapR2, cv2.INTER_LINEAR);
-    print(undistorted_rectifiedL.shape)
-    # remember to convert to grayscale (as the disparity matching works on grayscale)
-
-    grayL = cv2.cvtColor(undistorted_rectifiedL,cv2.COLOR_BGR2GRAY);
-    grayR = cv2.cvtColor(undistorted_rectifiedR,cv2.COLOR_BGR2GRAY);
-    '''
-    track_window = cv2.selectROI(grayL, False)
-    c,r,w,h      = track_window
-    print(track_window)
     
-    # set up the ROI for tracking
-    im0 = grayL[r:r+h, c:c+w]
-    im1 = grayR[r:r+h, c:c+w]
-    '''
-    #vis2 = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
+    # remember to convert to grayscale (as the disparity matching works on grayscale)
+    grayL0 = cv2.cvtColor(undistorted_rectifiedL,cv2.COLOR_BGR2GRAY);
+    grayR0 = cv2.cvtColor(undistorted_rectifiedR,cv2.COLOR_BGR2GRAY);
+    
+    # ===========================1
+    # grab frames from camera (to ensure best time sync.)
+    camL.grab();
+    camR.grab();
 
-    # compute disparity image from undistorted and rectified versions
-    # (which for reasons best known to the OpenCV developers is returned scaled by 16)
-    '''
-    disparity = stereoProcessor.compute(undistorted_rectifiedL,undistorted_rectifiedR);
-    cv2.filterSpeckles(disparity, 0, 4000, 128);
+    # then retrieve the images in slow(er) time
+    # (do not be tempted to use read() !)
 
-    # scale the disparity to 8-bit for viewing
+    ret, frameL = camL.retrieve();
+    ret, frameR = camR.retrieve();
+        
+    # undistort and rectify based on the mappings (could improve interpolation and image border settings here)
+    # N.B. mapping works independant of number of image channels
 
-    disparity_scaled = (disparity / 16.).astype(np.uint8) + abs(disparity.min())
-    '''
+    undistorted_rectifiedL = cv2.remap(frameL, mapL1, mapL2, cv2.INTER_LINEAR);
+    undistorted_rectifiedR = cv2.remap(frameR, mapR1, mapR2, cv2.INTER_LINEAR);
+    
+    # remember to convert to grayscale (as the disparity matching works on grayscale)
+    grayL1 = cv2.cvtColor(undistorted_rectifiedL,cv2.COLOR_BGR2GRAY);
+    grayR1 = cv2.cvtColor(undistorted_rectifiedR,cv2.COLOR_BGR2GRAY);
+    
+    # ===========================2
+    # grab frames from camera (to ensure best time sync.)
+    camL.grab();
+    camR.grab();
+
+    # then retrieve the images in slow(er) time
+    # (do not be tempted to use read() !)
+
+    ret, frameL = camL.retrieve();
+    ret, frameR = camR.retrieve();
+        
+    # undistort and rectify based on the mappings (could improve interpolation and image border settings here)
+    # N.B. mapping works independant of number of image channels
+
+    undistorted_rectifiedL = cv2.remap(frameL, mapL1, mapL2, cv2.INTER_LINEAR);
+    undistorted_rectifiedR = cv2.remap(frameR, mapR1, mapR2, cv2.INTER_LINEAR);
+    
+    # remember to convert to grayscale (as the disparity matching works on grayscale)
+    grayL2 = cv2.cvtColor(undistorted_rectifiedL,cv2.COLOR_BGR2GRAY);
+    grayR2 = cv2.cvtColor(undistorted_rectifiedR,cv2.COLOR_BGR2GRAY);
+
+    track_window = cv2.selectROI(undistorted_rectifiedL, False)
+    c,r,w,h      = track_window
+    
     #disparity_scaled = bm.disp_bm(im0, im1)
-    disparity_scaled = bm.disp_bm(grayL, grayR)
+    #disparity_scaled = (disparity / 16.).astype(np.uint8) + abs(disparity.min())
     #disparity_scaled = sgbm.disp_sgbm(undistorted_rectifiedL, undistorted_rectifiedR)
     # display image
     #count = count + 1
-    track_window = cv2.selectROI(undistorted_rectifiedL, False)
-    c,r,w,h      = track_window
 
-    points = cv2.reprojectImageTo3D(disparity_scaled[r:r+h, c:c+w], Q)
-    print(points)
-    
-    # set up the ROI for tracking
-    #im0 = grayL[r:r+h, :]
-    #im1 = grayR[r:r+h, :]
-    
+    disparity_scaled = bm.disp_bm(grayL0, grayR0)
+    points = cv2.reprojectImageTo3D(disparity_scaled, Q)
+    points = points[r:r+h, c:c+w, :]
     coor = np.mean(np.mean(points, axis=0), axis=0)
-    print(np.degrees(np.arctan2(coor[1], coor[0])))
-    print(np.linalg.norm([coor[0], coor[1]]))
+    angle0 = np.degrees(np.arctan2(coor[2], coor[0]))
+    distance0 = np.linalg.norm([coor[0], coor[2]])
+    print('=======================')
+    print(angle0)
+    print(distance0)
+    
+    cv2.imshow(windowNameD, disparity_scaled);
+    key = cv2.waitKey(0)
+    
+    disparity_scaled = bm.disp_bm(grayL1, grayR1)
+    points = cv2.reprojectImageTo3D(disparity_scaled, Q)
+    points = points[r:r+h, c:c+w, :]
+    coor = np.mean(np.mean(points, axis=0), axis=0)
+    angle1 = np.degrees(np.arctan2(coor[2], coor[0]))
+    distance1 = np.linalg.norm([coor[0], coor[2]])
+    print('=======================')
+    print(angle1)
+    print(distance1)
+    
+    cv2.imshow(windowNameD, disparity_scaled);
+    key = cv2.waitKey(0)
+
+    disparity_scaled = bm.disp_bm(grayL2, grayR2)
+    points = cv2.reprojectImageTo3D(disparity_scaled, Q)
+    points = points[r:r+h, c:c+w, :]
+    coor = np.mean(np.mean(points, axis=0), axis=0)
+    angle2 = np.degrees(np.arctan2(coor[2], coor[0]))
+    distance2 = np.linalg.norm([coor[0], coor[2]])
+    print('=======================')
+    print(angle2)
+    print(distance2)
+    
+    cv2.imshow(windowNameD, disparity_scaled);
+    key = cv2.waitKey(0)
 
 
-    cv2.imshow(windowNameL,undistorted_rectifiedL);
-    cv2.imshow(windowNameR,undistorted_rectifiedR);
+    #cv2.imshow(windowNameL,frameL);
+    #cv2.imshow(windowNameR,frameR);
 
     #display disparity
 
-    cv2.imshow(windowNameD, disparity_scaled);
+    #cv2.imshow(windowNameD, disparity_scaled);
 
     # start the event loop - essential
 
-    key = cv2.waitKey(30) & 0xFF; # wait 40ms (i.e. 1000ms / 25 fps = 40 ms)
+    #key = cv2.waitKey(30) & 0xFF; # wait 40ms (i.e. 1000ms / 25 fps = 40 ms)
 
     # It can also be set to detect specific key strokes by recording which key is pressed
 
     # e.g. if user presses "x" then exit
-
+    camL.release()
+    camR.release()
+    cv2.destroyAllWindows()
+    exit()
     if (key == ord('c')):
         keep_processing = False;
 
