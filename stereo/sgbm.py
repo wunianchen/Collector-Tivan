@@ -1,7 +1,7 @@
 import numpy as np
-from sklearn.preprocessing import normalize
+#from sklearn.preprocessing import normalize
 import cv2
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
  
 #print('loading images...')
 #imgL = cv2.imread('im0.png')  # downscale images for faster processing

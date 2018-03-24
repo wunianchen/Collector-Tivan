@@ -7,8 +7,8 @@ import pickle
 
 # define video capture object
 
-camR = cv2.VideoCapture(0);
-camL = cv2.VideoCapture(1);
+camL = cv2.VideoCapture(0);
+camR = cv2.VideoCapture(1);
 
 # define display window names
 
@@ -55,6 +55,21 @@ for i in range(20):
     ret, frameR = camR.retrieve();
     
 while (keep_processing):
+    while 1:
+        camL.grab();
+        camR.grab();
+
+        # then retrieve the images in slow(er) time
+        # (do not be tempted to use read() !)
+
+        ret, frameL = camL.retrieve();
+        ret, frameR = camR.retrieve();
+        
+        cv2.imshow(windowNameL,frameL);
+        cv2.imshow(windowNameR,frameR);
+        key = cv2.waitKey(100) & 0xFF
+        if (key == ord('c')):
+            break
     # ===========================0
     # grab frames from camera (to ensure best time sync.)
     camL.grab();
@@ -176,16 +191,17 @@ while (keep_processing):
 
     # start the event loop - essential
 
-    #key = cv2.waitKey(30) & 0xFF; # wait 40ms (i.e. 1000ms / 25 fps = 40 ms)
+    #key = cv2.waitKey(0)# wait 40ms (i.e. 1000ms / 25 fps = 40 ms)
 
     # It can also be set to detect specific key strokes by recording which key is pressed
 
     # e.g. if user presses "x" then exit
-    camL.release()
-    camR.release()
-    cv2.destroyAllWindows()
-    exit()
-    if (key == ord('c')):
+    
+    
+    if (key == ord('x')):
+        camL.release()
+        camR.release()
+        print('release')
         keep_processing = False;
 
 #####################################################################
