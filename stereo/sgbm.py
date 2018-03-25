@@ -1,11 +1,7 @@
 import numpy as np
-#from sklearn.preprocessing import normalize
 import cv2
-#import matplotlib.pyplot as plt
  
-#print('loading images...')
-#imgL = cv2.imread('im0.png')  # downscale images for faster processing
-#imgR = cv2.imread('im1.png')
+
 def disp_sgbm(imgL,imgR):
     # SGBM Parameters -----------------
     window_size = 3                     # wsize default 3; 5; 7 for SGBM reduced size image; 15 for SGBM full size image (1300px and above); 5 Works nicely
@@ -45,15 +41,7 @@ def disp_sgbm(imgL,imgR):
     filteredImg = cv2.normalize(src=filteredImg, dst=filteredImg, beta=0, alpha=255, norm_type=cv2.NORM_MINMAX);
     filteredImg = np.uint8(filteredImg)
     return filteredImg
-    #cv2.imshow('Disparity Map', filteredImg)
-    #cv2.waitKey()
-    #cv2.destroyAllWindows()
-    #cv2.save.fig('recylcle.png')
-    #print()
-    #plt.imshow(filteredImg,'gray')
-    #plt.show()
-    #plt.imsave('recycle_sgbm.png',filteredImg)
-    print('done')
+
     '''
     ply_header = ply
     format ascii 1.0

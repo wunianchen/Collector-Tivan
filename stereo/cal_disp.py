@@ -20,13 +20,10 @@ windowNameR = "RIGHT Camera Input"; # window name
 
 print("-> calc. disparity image")
 
-max_disparity = 128;
-stereoProcessor = cv2.StereoSGBM_create(0, max_disparity, 21);
-
 keep_processing = True;
 
 windowNameD = "SGBM Stereo Disparity - Output"; # window name
-#count = 0
+
 f0 = open('mapL1.pckl','rb')
 mapL1 = pickle.load(f0)
 f0.close()
@@ -51,9 +48,6 @@ for i in range(20):
     camL.grab();
     camR.grab();
 
-    # then retrieve the images in slow(er) time
-    # (do not be tempted to use read() !)
-
     ret, frameL = camL.retrieve();
     ret, frameR = camR.retrieve();
     
@@ -62,14 +56,12 @@ while (keep_processing):
         camL.grab();
         camR.grab();
 
-        # then retrieve the images in slow(er) time
-        # (do not be tempted to use read() !)
-
         ret, frameL = camL.retrieve();
         ret, frameR = camR.retrieve();
         
         cv2.imshow(windowNameL,frameL);
         cv2.imshow(windowNameR,frameR);
+        
         key = cv2.waitKey(100) & 0xFF
         if (key == ord('c')):
             break
@@ -94,13 +86,8 @@ while (keep_processing):
     
     rst = 0
     for i in range(10):
-        # ===========================0
-        # grab frames from camera (to ensure best time sync.)
         camL.grab();
         camR.grab();
-
-        # then retrieve the images in slow(er) time
-        # (do not be tempted to use read() !)
 
         ret, frameL = camL.retrieve();
         ret, frameR = camR.retrieve();
@@ -134,11 +121,4 @@ while (keep_processing):
         print('release')
         keep_processing = False;
 
-#####################################################################
-
-# close all windows and cams.
-
 cv2.destroyAllWindows()
-
-#####################################################################
-
