@@ -1,3 +1,11 @@
+////////////////////////////////////////////////////////////
+//			Collector Tivan Arduino Control	V2.0		////
+//				EECS 452 Winter 2018 @ N.W				////
+////////////////////////////////////////////////////////////
+
+// TODO: Communicate with Raspberry Pi
+// TODO: Calibrate delay_per_cycle when robot is change
+
 #include <Servo.h>                                
 #include <Adafruit_MotorShield.h>  
 #include "Adafruit_VL53L0X.h"                                  
@@ -10,8 +18,8 @@
 #define B_SPEED               100                     // set the backward speed
 #define F_STOP                0                       // set the stop speed
 #define SERVO_RELE_POS        150                     // set the servo release position
-#define SERVO_GRAB_POS        100                      // set the servo grab position
-#define SERVO_GRAB_DIST_MM    35                     // define the location to grab garbage, currently set 25 mm
+#define SERVO_GRAB_POS        100                     // set the servo grab position
+#define SERVO_GRAB_DIST_MM    35                      // define the location to grab garbage, currently set 35 mm
 #define DELAY_PER_CYCLE       4210                    // measure the rotate degree, need to calibrate in the future
 
 // Create the motor shield object with the default I2C address
@@ -33,7 +41,7 @@ void setup() {
   Serial.println("Collector Tivan Initialization Starts...");    // initialization message
 
   // Motor & Servo initialization
-  AFMS.begin();                                                 // create with the default frequency 1.6 KHz.
+  AFMS.begin();                                                  // create with the default frequency 1.6 KHz.
   grab_servo.attach(SERVO_ATTACH_PIN);                              
   grab_servo.write(SERVO_RELE_POS);                    
 
@@ -45,6 +53,7 @@ void setup() {
   R_Motor -> setSpeed(INIT_SPEED);
   R_Motor -> run(RELEASE);
   Serial.println("Motorshield Initialization Success!");
+  // Motor & Servo initialization ends
 
   // VL53L0 sensor initialization 
   if(!lox.begin())
@@ -57,6 +66,8 @@ void setup() {
 }
 
 void loop() {
+// TODO: This part of code is just used for testing simple motion, need to refine
+
   delay(10000);
   robot_rotate(90);
   delay(1000);
@@ -87,7 +98,6 @@ void robot_rotate(double angle_degree)
       Serial.println(delay_time);
       Serial.println("****************");
       delay(delay_time);
-//      delay(1000);
     }
     
     // If angle degree is smaller than 0, turn left.
@@ -98,9 +108,15 @@ void robot_rotate(double angle_degree)
       R_Motor -> run(FORWARD);
       L_Motor -> setSpeed(B_SPEED);
       R_Motor -> setSpeed(F_SPEED);
-      int delay_time = (angle_degree/360) * DELAY_PER_CYCLE;
+      double test = angle_degree * DELAY_PER_CYCLE;
+      Serial.println(test);
+      double delay_time = (angle_degree/360) * DELAY_PER_CYCLE;
+      Serial.print("angle degree is:");
+      Serial.println(angle_degree);
+      Serial.print("Delay Time is:");
+      Serial.println(delay_time);
+      Serial.println("****************");
       delay(delay_time);
-//      delay(1000);
     }
 }
 
@@ -117,7 +133,7 @@ void robot_forward_and_release()
   R_Motor -> run(FORWARD);
   L_Motor -> setSpeed(F_SPEED);
   R_Motor -> setSpeed(F_SPEED);  
-  delay(5000);
+  delay(5000);												// TODO: need to refine this part
   grab_servo.write(SERVO_RELE_POS);
 }
 
