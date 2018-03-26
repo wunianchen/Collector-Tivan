@@ -30,7 +30,7 @@
 #define	B_SPEED               200                     // set the backward speed
 #define	F_STOP                0					              // set the stop speed
 #define	SERVO_RELE_POS        150                     // set the servo release position
-#define	SERVO_GRAB_POS        75                      // set the servo grab position
+#define	SERVO_GRAB_POS        90                     // set the servo grab position
 #define SERVO_GRAB_DIST_MM    100                     // define the location to grab garbage, currently set 100 mm
 
 // Constant for MPU6050
@@ -85,10 +85,6 @@ long loop_timer;
 int temp; 
 */
 
-// Variable for the data that receive from Raspberry pi TODO: Use them in system integration
-double distance_from_rpi;                                // The distance that get from openCV
-double angle_from_rpi;                                   // The angle that derived from openCV
-
 
 // Read the distance measure from VL53L0x sensor
 VL53L0X_RangingMeasurementData_t VL53L0x_measure;
@@ -119,9 +115,9 @@ void setup() {
     while(1);
   }
   Serial.println("VL53L0X Initialization Success!");
-  // VL53L0 sensor initialzation ends
+  // VL53L0 sensor initialzation ends 
 
-/*  // LSM303 Initialization
+  /* LSM303 Initialization
   if(!mag.begin())
   {
     Serial.println("Ooops, no LSM303 detected ... Check your wiring!");
@@ -202,8 +198,42 @@ void setup() {
   // MPU6050 initialization ends */
 }
 
+void loop(){
+  Serial.print("Reading a measurement...");
+ 
+  forward_and_grab();
+}
 
-void loop() {
+void forward_and_grab()
+{  
+  while(1)
+  {
+    lox.rangingTest(&VL53L0x_measure, false);               // pass in "true" to get debug data printout
+
+    if(VL53L0x_measure.RangeStatus !=4)
+    {
+      Serial.print("Distance (mm):"); Serial.println(VL53L0x_measure.RangeMilliMeter);  
+    }
+    else
+    {
+      Serial.println("Out of Range!");  
+    }
+    
+   L_Motor -> run(FORWARD);
+   R_Motor -> run(FORWARD);
+   L_Motor -> setSpeed(F_SPEED);
+   R_Motor -> setSpeed(F_SPEED);     
+  
+  if(VL53L0x_measure.RangeMilliMeter < 35)
+  {
+    L_Motor -> run (RELEASE);
+    R_Motor -> run (RELEASE);
+    grab_servo.write(SERVO_GRAB_POS);
+    break;
+  }
+  }
+}
+/*void loop() {
     // Robot Formal Scheduling Algorithm V2.0
     // Default Motion: The robot will turn right 90 degree/2sec when no objects detected from Rpi
     // When detected objects: receive data and distance from Rpi, turn right to a certain degree
@@ -211,9 +241,9 @@ void loop() {
     // TODO:(1) Get data from Rpi. (2) Decide whether we need to re-measure the distance and angle
     // becuse VL53L0 is very in accurate. Also, how to judge distance is smaller than 30cm?
 
-    read_LSM_303_data();
+    // read_LSM_303_data();
 
-    // Default Motion: Turn right each 90 degree
+/*    // Default Motion: Turn right each 90 degree
     L_Motor -> run(FORWARD);
     R_Motor -> run(RELEASE);
     L_Motor -> setSpeed(F_SPEED);
@@ -221,7 +251,7 @@ void loop() {
 
 
 
-/*    Serial.print("Reading a measurement...");
+    Serial.print("Reading a measurement...");
     lox.rangingTest(&VL53L0x_measure, false);               // pass in "true" to get debug data printout
 
     if(VL53L0x_measure.RangeStatus !=4)
@@ -276,10 +306,12 @@ void loop() {
     if (readString =="STOP"){
       L_Motor -> run (RELEASE);
       R_Motor -> run (RELEASE);
-    }
+    } 
 
-    if (VL53L0x_measure.RangeMilliMeter < 100){                // When the distance between sensor and grab stuff
+    if (VL53L0x_measure.RangeMilliMeter < 180){                // When the distance between sensor and grab stuff
       grab_servo.write(SERVO_GRAB_POS);                       // smaller than 30, grab the stuff.
+
+      delay(1000);
     }
 
     if (readString == "DROP"){
@@ -288,12 +320,12 @@ void loop() {
     }
 
     readString="";
-    */
+    
     //    read_MPU_6050_data();
 }
-
+*/
 /************************Operation with LSM303***********************************/
-void read_LSM_303_data()
+/*void read_LSM_303_data()
 {
   // Get a new sensor event
   mag.getEvent(&direct_event);
@@ -305,9 +337,9 @@ void read_LSM_303_data()
     heading_angle = heading_angle + 360;  
   }
   Serial.print("Compass Heading:");
-  Serial.println(heading);
+  Serial.println(heading_angle);
   delay(500);
-}
+} */
 
 /************************Operation with MPU6050**********************************/
 /*Please note that MPU6050 is very time sensitive, so it has to be operated fast*/
