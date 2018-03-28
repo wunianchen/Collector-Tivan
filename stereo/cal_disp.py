@@ -7,7 +7,7 @@ import pickle
 
 
 def to_cm(x):
-    return (0.1884*x - 40.327)
+    return (0.1313*x - 3.8408)
 
 
 def reject_outliers(data, m):
@@ -15,10 +15,10 @@ def reject_outliers(data, m):
     return data[abs(data-np.mean(data)) < m * np.std(data)]
 
 
-def normalize(X):
-    image_mean = np.mean(X, axis=(0,1,2))
-    image_std = np.std(X, axis=(0,1,2))
-    im = (X - image_mean) / image_std
+def normalize(im):
+    #image_mean = np.mean(X, axis=(0,1,2))
+    #image_std = np.std(X, axis=(0,1,2))
+    #im = (X - image_mean) / image_std
     im = cv2.normalize(src=im, dst=im, beta=0, alpha=255, norm_type=cv2.NORM_MINMAX)
     im = np.uint8(im)
     return im
@@ -82,7 +82,7 @@ while (keep_processing):
         cv2.imshow(windowNameR,undistorted_rectifiedR);
         
         key = cv2.waitKey(100) & 0xFF
-        if (key == ord('c')):
+        if (key == ord('a')):
             break
         elif (key == ord('x')):
             camL.release()
@@ -103,21 +103,8 @@ while (keep_processing):
     track_window = cv2.selectROI(undistorted_rectifiedL, False)
     c,r,w,h      = track_window
     
-    camL.grab();
-    camR.grab();
-
-    ret, frameL = camL.retrieve();
-    ret, frameR = camR.retrieve();
-
-    undistorted_rectifiedL = cv2.remap(frameL, mapL1, mapL2, cv2.INTER_LINEAR);
-    undistorted_rectifiedR = cv2.remap(frameR, mapR1, mapR2, cv2.INTER_LINEAR);
-
-    track_window = cv2.selectROI(undistorted_rectifiedL, False)
-    c1,r1,w1,h1      = track_window
-    
     number = 10
     rst = np.zeros((1,number))
-    rst1 = np.zeros((1,number))
     for i in range(number):
         camL.grab();
         camR.grab();
@@ -134,18 +121,12 @@ while (keep_processing):
         undistorted_rectifiedL = normalize(undistorted_rectifiedL)
         undistorted_rectifiedR = normalize(undistorted_rectifiedR)
         
-        """
+        
         # remember to convert to grayscale (as the disparity matching works on grayscale)
         grayL = cv2.cvtColor(undistorted_rectifiedL,cv2.COLOR_BGR2GRAY);
         grayR = cv2.cvtColor(undistorted_rectifiedR,cv2.COLOR_BGR2GRAY);
-        
-        grayL = cv2.normalize(src=grayL, dst=grayL, beta=0, alpha=255, norm_type=cv2.NORM_MINMAX);
-        grayL = np.uint8(grayL)
-        grayR = cv2.normalize(src=grayR, dst=grayR, beta=0, alpha=255, norm_type=cv2.NORM_MINMAX);
-        grayR = np.uint8(grayR)
-        """
 
-        disparity_scaled = sgbm.disp_sgbm(undistorted_rectifiedL, undistorted_rectifiedR)
+        disparity_scaled = sgbm.disp_sgbm(grayL, grayR)
         
         points1 = cv2.reprojectImageTo3D(disparity_scaled, Q)
         points = points1[r:r+h, c:c+w, :]
@@ -158,22 +139,10 @@ while (keep_processing):
         print('distance', distance)
         rst[0, i] = distance
         
-        ###
-        points = points1[r1:r1+h1, c1:c1+w1, :]
-        coor = np.mean(points, axis=(0,1))
-        angle = np.degrees(np.arctan2(coor[2], coor[0]))
-        distance = np.linalg.norm([coor[0], coor[2]])
-        print('======',i)
-        print('angle: ', angle)
-        print('distance', distance)
-        rst1[0, i] = distance
-        ###
         cv2.imshow(windowNameD, disparity_scaled);
         key = cv2.waitKey(40) & 0xFF;
     
     final = to_cm(np.mean(reject_outliers(rst, 1.5)))
-    print('final distance: ', final)
-    final = to_cm(np.mean(reject_outliers(rst1, 1.5)))
     print('final distance: ', final)
     
     if (key == ord('x')):
