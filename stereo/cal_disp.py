@@ -15,6 +15,15 @@ def reject_outliers(data, m):
     return data[abs(data-np.mean(data)) < m * np.std(data)]
 
 
+def normalize(X):
+    image_mean = np.mean(X, axis=(0,1,2))
+    image_std = np.std(X, axis=(0,1,2))
+    im = (X - image_mean) / image_std
+    im = cv2.normalize(src=im, dst=im, beta=0, alpha=255, norm_type=cv2.NORM_MINMAX)
+    im = np.uint8(im)
+    return im
+
+
 # define video capture object
 
 camL = cv2.VideoCapture(0);
@@ -121,7 +130,11 @@ while (keep_processing):
 
         undistorted_rectifiedL = cv2.remap(frameL, mapL1, mapL2, cv2.INTER_LINEAR);
         undistorted_rectifiedR = cv2.remap(frameR, mapR1, mapR2, cv2.INTER_LINEAR);
+
+        undistorted_rectifiedL = normalize(undistorted_rectifiedL)
+        undistorted_rectifiedR = normalize(undistorted_rectifiedR)
         
+        """
         # remember to convert to grayscale (as the disparity matching works on grayscale)
         grayL = cv2.cvtColor(undistorted_rectifiedL,cv2.COLOR_BGR2GRAY);
         grayR = cv2.cvtColor(undistorted_rectifiedR,cv2.COLOR_BGR2GRAY);
@@ -130,8 +143,9 @@ while (keep_processing):
         grayL = np.uint8(grayL)
         grayR = cv2.normalize(src=grayR, dst=grayR, beta=0, alpha=255, norm_type=cv2.NORM_MINMAX);
         grayR = np.uint8(grayR)
-        
-        disparity_scaled = sgbm.disp_sgbm(grayL, grayR)
+        """
+
+        disparity_scaled = sgbm.disp_sgbm(undistorted_rectifiedL, undistorted_rectifiedR)
         
         points1 = cv2.reprojectImageTo3D(disparity_scaled, Q)
         points = points1[r:r+h, c:c+w, :]
@@ -146,7 +160,7 @@ while (keep_processing):
         
         ###
         points = points1[r1:r1+h1, c1:c1+w1, :]
-        coor = np.mean(np.mean(points, axis=0), axis=0)
+        coor = np.mean(points, axis=(0,1))
         angle = np.degrees(np.arctan2(coor[2], coor[0]))
         distance = np.linalg.norm([coor[0], coor[2]])
         print('======',i)
