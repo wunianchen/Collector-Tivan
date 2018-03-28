@@ -5,8 +5,15 @@ import bm
 import sgbm
 import pickle
 
+
 def to_cm(x):
-    return (0.1729*x - 18.271)
+    return (0.1884*x - 40.327)
+
+
+def reject_outliers(data, m):
+    data = data.reshape((1, data.shape[0]*data.shape[1]))
+    return data[abs(data-np.mean(data)) < m * np.std(data)]
+
 
 # define video capture object
 
@@ -59,8 +66,11 @@ while (keep_processing):
         ret, frameL = camL.retrieve();
         ret, frameR = camR.retrieve();
         
-        cv2.imshow(windowNameL,frameL);
-        cv2.imshow(windowNameR,frameR);
+        undistorted_rectifiedL = cv2.remap(frameL, mapL1, mapL2, cv2.INTER_LINEAR);
+        undistorted_rectifiedR = cv2.remap(frameR, mapR1, mapR2, cv2.INTER_LINEAR);
+        
+        cv2.imshow(windowNameL,undistorted_rectifiedL);
+        cv2.imshow(windowNameR,undistorted_rectifiedR);
         
         key = cv2.waitKey(100) & 0xFF
         if (key == ord('c')):
@@ -84,8 +94,22 @@ while (keep_processing):
     track_window = cv2.selectROI(undistorted_rectifiedL, False)
     c,r,w,h      = track_window
     
-    rst = 0
-    for i in range(10):
+    camL.grab();
+    camR.grab();
+
+    ret, frameL = camL.retrieve();
+    ret, frameR = camR.retrieve();
+
+    undistorted_rectifiedL = cv2.remap(frameL, mapL1, mapL2, cv2.INTER_LINEAR);
+    undistorted_rectifiedR = cv2.remap(frameR, mapR1, mapR2, cv2.INTER_LINEAR);
+
+    track_window = cv2.selectROI(undistorted_rectifiedL, False)
+    c1,r1,w1,h1      = track_window
+    
+    number = 10
+    rst = np.zeros((1,number))
+    rst1 = np.zeros((1,number))
+    for i in range(number):
         camL.grab();
         camR.grab();
 
@@ -102,17 +126,40 @@ while (keep_processing):
         grayL = cv2.cvtColor(undistorted_rectifiedL,cv2.COLOR_BGR2GRAY);
         grayR = cv2.cvtColor(undistorted_rectifiedR,cv2.COLOR_BGR2GRAY);
         
-        disparity_scaled = bm.disp_bm(grayL, grayR)
-        points = cv2.reprojectImageTo3D(disparity_scaled, Q)
-        points = points[r:r+h, c:c+w, :]
+        grayL = cv2.normalize(src=grayL, dst=grayL, beta=0, alpha=255, norm_type=cv2.NORM_MINMAX);
+        grayL = np.uint8(grayL)
+        grayR = cv2.normalize(src=grayR, dst=grayR, beta=0, alpha=255, norm_type=cv2.NORM_MINMAX);
+        grayR = np.uint8(grayR)
+        
+        disparity_scaled = sgbm.disp_sgbm(grayL, grayR)
+        
+        points1 = cv2.reprojectImageTo3D(disparity_scaled, Q)
+        points = points1[r:r+h, c:c+w, :]
         coor = np.mean(np.mean(points, axis=0), axis=0)
         angle = np.degrees(np.arctan2(coor[2], coor[0]))
         distance = np.linalg.norm([coor[0], coor[2]])
+        print('======',i)
+        print(coor)
         print('angle: ', angle)
         print('distance', distance)
-        rst = rst + distance
+        rst[0, i] = distance
+        
+        ###
+        points = points1[r1:r1+h1, c1:c1+w1, :]
+        coor = np.mean(np.mean(points, axis=0), axis=0)
+        angle = np.degrees(np.arctan2(coor[2], coor[0]))
+        distance = np.linalg.norm([coor[0], coor[2]])
+        print('======',i)
+        print('angle: ', angle)
+        print('distance', distance)
+        rst1[0, i] = distance
+        ###
+        cv2.imshow(windowNameD, disparity_scaled);
+        key = cv2.waitKey(40) & 0xFF;
     
-    final = to_cm(rst/10)
+    final = to_cm(np.mean(reject_outliers(rst, 1.5)))
+    print('final distance: ', final)
+    final = to_cm(np.mean(reject_outliers(rst1, 1.5)))
     print('final distance: ', final)
     
     if (key == ord('x')):
