@@ -5,6 +5,24 @@ import bm
 import sgbm
 import pickle
 
+import smbus
+import time
+
+# for RPI version 1, use "bus = smbus.SMBus(0)"
+bus = smbus.SMBus(1)
+# This is the address we setup in the Arduino Program
+address = 0x04
+
+
+def send2uno(angle):
+    data_list = list(str(data))
+    print(data_list)
+    for i in data_list:
+    	#Sends to the Slaves 
+        bus.write_byte(address,int(ord(i)))
+        time.sleep(.1)
+    return 1
+
 
 def to_cm(x):
     return (0.1313*x - 3.8408)
@@ -26,8 +44,8 @@ def normalize(im):
 
 # define video capture object
 
-camL = cv2.VideoCapture(0);
-camR = cv2.VideoCapture(1);
+camR = cv2.VideoCapture(0);
+camL = cv2.VideoCapture(1);
 
 # define display window names
 
@@ -99,12 +117,16 @@ while (keep_processing):
 
     undistorted_rectifiedL = cv2.remap(frameL, mapL1, mapL2, cv2.INTER_LINEAR);
     undistorted_rectifiedR = cv2.remap(frameR, mapR1, mapR2, cv2.INTER_LINEAR);
-
+    
+    cv2.imwrite('L.png', undistorted_rectifiedL)
+    cv2.imwrite('R.png', undistorted_rectifiedR)
+    
     track_window = cv2.selectROI(undistorted_rectifiedL, False)
     c,r,w,h      = track_window
     
     number = 10
     rst = np.zeros((1,number))
+    angle_rst = np.zeros((1,number))
     for i in range(number):
         camL.grab();
         camR.grab();
@@ -127,6 +149,7 @@ while (keep_processing):
         grayR = cv2.cvtColor(undistorted_rectifiedR,cv2.COLOR_BGR2GRAY);
 
         disparity_scaled = sgbm.disp_sgbm(grayL, grayR)
+        cv2.imwrite(str(i)+'.png', disparity_scaled)
         
         points1 = cv2.reprojectImageTo3D(disparity_scaled, Q)
         points = points1[r:r+h, c:c+w, :]
@@ -138,12 +161,17 @@ while (keep_processing):
         print('angle: ', angle)
         print('distance', distance)
         rst[0, i] = distance
+        angle_rst[0, i] = angle
         
         cv2.imshow(windowNameD, disparity_scaled);
         key = cv2.waitKey(40) & 0xFF;
     
     final = to_cm(np.mean(reject_outliers(rst, 1.5)))
     print('final distance: ', final)
+    final_angle = int(abs(90 - np.mean(angle_rst)))
+    print('final angle: ', final_angle)
+    #send2uno(final_angle)
+    
     
     if (key == ord('x')):
         camL.release()
