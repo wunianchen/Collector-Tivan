@@ -1,9 +1,8 @@
-////////////////////////////////////////////////////////////
-//			Collector Tivan Arduino Control	V2.0		////
-//				EECS 452 Winter 2018 @ N.W				////
-////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////
+//			Collector Tivan Arduino Control	V2.0		    //
+//				EECS 452 Winter 2018 @ N.W				        //
+//////////////////////////////////////////////////////
 
-// TODO: Communicate with Raspberry Pi
 // TODO: Calibrate delay_per_cycle when robot is change
 
 #include <Wire.h>
@@ -15,11 +14,12 @@
 // Constant for servo
 #define SERVO_ATTACH_PIN      10                      // digital#10 pin controls servo#1 input
 #define INIT_SPEED            200                     // set the initial motor speed
-#define F_SPEED               50                     // set the forward speed
-#define B_SPEED               50                     // set the backward speed
+#define ROT_SPEED             50                      // set the rotate speed
+#define F_SPEED               100                      // set the forward speed
+#define B_SPEED               255                      // set the backward speed
 #define F_STOP                0                       // set the stop speed
 #define SERVO_RELE_POS        150                     // set the servo release position
-#define SERVO_GRAB_POS        100                     // set the servo grab position
+#define SERVO_GRAB_POS        90                      // set the servo grab position
 #define SERVO_GRAB_DIST_MM    35                      // define the location to grab garbage, currently set 35 mm
 #define DELAY_PER_CYCLE       8000                    // measure the rotate degree, need to calibrate in the future
 
@@ -44,6 +44,8 @@ VL53L0X_RangingMeasurementData_t VL53L0x_measure;
 char direct;
 char angle_exp = 'x';
 char last_angle_exp = 'x';
+bool accurate_control = false;
+double rotate_seq[] = {45, 22.5, 11.25, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625};
 int state = 0;
 int i;
 
@@ -66,13 +68,13 @@ void setup() {
   Serial.println("Motorshield Initialization Success!");
   // Motor & Servo initialization ends
 
-  /* VL53L0 sensor initialization 
+  // VL53L0 sensor initialization 
   if(!lox.begin())
   {
     Serial.println("Failed to boot VL53L0X");
     while(1);
   }
-  Serial.println("VL53L0X Initialization Success!"); */
+  Serial.println("VL53L0X Initialization Success!"); 
   // VL53L0 sensor initialzation ends 
 
   // I2C Initialization
@@ -82,8 +84,15 @@ void setup() {
 }
 
 void loop() {
-  
-  if(last_angle_exp != angle_exp)
+	if(direct == 'a' && accurate_control == true)
+	{
+    Serial.println("ACCURATE ADJUSTEMENT!!!");
+		robot_rotate(-double(angle_exp - '0'));
+    accurate_control = false;
+	}
+
+  else if((direct == 'l' || direct == 'r' || direct == 'c') && (last_angle_exp != angle_exp))
+ // if(last_angle_exp != angle_exp)
   {
     Serial.print("Last Angle:");
     Serial.println(last_angle_exp);
@@ -97,7 +106,8 @@ void loop() {
       Serial.println("Turn LEFT!!!");
       Serial.print("TURN DEGREE:");
       Serial.println(angle_exp -'0');
-      robot_rotate(90/pow(2, double(angle_exp -'0')));
+      //robot_rotate(90/pow(2, double(angle_exp -'0')));
+      robot_rotate(rotate_seq[int(angle_exp -'0')-1]);
     }
 
     if(direct == 'r')
@@ -105,7 +115,15 @@ void loop() {
       Serial.println("Turn RIGHT!!!");
       Serial.print("TURN DEGREE:");
       Serial.println(angle_exp -'0');
-      robot_rotate(-90/pow(2, double(angle_exp -'0')));
+      //robot_rotate(-90/pow(2, double(angle_exp -'0')));
+      robot_rotate(-rotate_seq[int(angle_exp -'0')-1]);
+    }
+
+    if(direct == 'c')
+    {
+      robot_forward_and_grab(); 
+      //robot_forward_and_release();
+      robot_stop();
     }
   } 
 
@@ -123,7 +141,6 @@ void loop() {
 
 // Receive data from I2C
 void receiveData(int byteCount) {
-
   while (Wire.available()) {
     Serial.print("i:");
     Serial.println(i);
@@ -137,7 +154,8 @@ void receiveData(int byteCount) {
     else if(i == 1)
     {
       angle_exp = Wire.read();
-      i--;  
+      i--;
+      accurate_control = true;  
       Serial.print("READ ANGLE_EXP:");
       Serial.println(angle_exp);
     }
@@ -152,8 +170,8 @@ void robot_rotate(double angle_degree)
     {
       L_Motor -> run(FORWARD);
       R_Motor -> run(BACKWARD);
-      L_Motor -> setSpeed(F_SPEED);
-      R_Motor -> setSpeed(B_SPEED);
+      L_Motor -> setSpeed(ROT_SPEED);
+      R_Motor -> setSpeed(ROT_SPEED);
       double test = angle_degree * DELAY_PER_CYCLE;
       //Serial.println(test);
       double delay_time = ((angle_degree/360) * DELAY_PER_CYCLE);
@@ -172,8 +190,8 @@ void robot_rotate(double angle_degree)
     {
       L_Motor -> run(BACKWARD);
       R_Motor -> run(FORWARD);
-      L_Motor -> setSpeed(B_SPEED);
-      R_Motor -> setSpeed(F_SPEED);
+      L_Motor -> setSpeed(ROT_SPEED);
+      R_Motor -> setSpeed(ROT_SPEED);
       double test = angle_degree * DELAY_PER_CYCLE;
       Serial.println(test);
       double delay_time = abs((angle_degree/360) * DELAY_PER_CYCLE);
@@ -195,15 +213,15 @@ void robot_stop()
 
 void robot_forward_and_release()
 {
-  L_Motor -> run(FORWARD);
-  R_Motor -> run(FORWARD);
+  L_Motor -> run(BACKWARD);
+  R_Motor -> run(BACKWARD);
   L_Motor -> setSpeed(F_SPEED);
   R_Motor -> setSpeed(F_SPEED);  
-  delay(5000);												// TODO: need to refine this part
+  delay(10000);												// TODO: need to refine this part
   grab_servo.write(SERVO_RELE_POS);
 }
 
-/*void robot_forward_and_grab()
+void robot_forward_and_grab()
 {  
   while(1)
   {
@@ -231,4 +249,4 @@ void robot_forward_and_release()
       break;
     }
   }
-} */
+}
