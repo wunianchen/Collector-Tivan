@@ -15,17 +15,21 @@
 #define SERVO_ATTACH_PIN      10                      // digital#10 pin controls servo#1 input
 #define INIT_SPEED            200                     // set the initial motor speed
 #define ROT_SPEED             50                      // set the rotate speed
-#define F_SPEED               100                      // set the forward speed
-#define B_SPEED               255                      // set the backward speed
+#define F_SPEED               100                     // set the forward speed
+#define B_SPEED               255                     // set the backward speed
 #define F_STOP                0                       // set the stop speed
 #define SERVO_RELE_POS        150                     // set the servo release position
 #define SERVO_GRAB_POS        90                      // set the servo grab position
 #define SERVO_GRAB_DIST_MM    35                      // define the location to grab garbage, currently set 35 mm
 #define DELAY_PER_CYCLE       8000                    // measure the rotate degree, need to calibrate in the future
-#define ARRUCRATE_ROT         250                     // determine the distance of accurate rotation
  
-// I2C
+// Constant for I2C between Rpi and Arduino
 #define SLAVE_ADDRESS         0x04
+
+// Constant for accurate rotation
+#define ACCURATE_ROT_DIST     250                     // determine the distance of accurate rotation
+#define ACCURATE_ROT_ANGLE    5                       // rotate degree when rotating based on sensor
+#define ACCURATE_ROT_CALI     -7                      // the calibration degree when rotating based on sensor    
 
 // Create the motor shield object with the default I2C address
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -47,10 +51,13 @@ int current_VL53L0x_measure = 9999;
 char direct;
 char angle_exp = 'x';
 char last_angle_exp = 'x';
-bool accurate_control = false;
-bool rotate_execute = true;
-bool judge_next = false;
-double rotate_seq[] = {45, 22.5, 11.25, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625};
+
+// Accurate control variable
+bool accurate_control = false;                                                          // waiting the result from CV. TODO: redefine this.
+bool rotate_by_sensor = true;                                                             // when the flag is true, keep doing accurate rotate by sensor
+bool judge_next = false;                                                                // used in accurate rotate by sensor to decide when rotate stop
+double rotate_seq[] = {45, 22.5, 11.25, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625};      // define the robot rotate degree sequence by using tracking algorithm
+
 int i;
 int state = 0;
 
@@ -89,7 +96,7 @@ void setup() {
 }
 
 void loop() {
-  if(rotate_execute == true)
+  if(rotate_by_sensor == true)
   {
     robot_sensor_rotate();
   }
@@ -97,7 +104,6 @@ void loop() {
 	{
     Serial.println("ACCURATE ADJUSTEMENT!!!");
 		robot_rotate(-double(angle_exp - '0'));
-    Serial.println("Shijing asked me to do this!!!");
     accurate_control = false;
 	}
 
@@ -143,14 +149,21 @@ void loop() {
   delay(1000);
 //  robot_forward_and_grab();
 //  delay(1000);
-  robot_rotate(180);
-  delay(1000);
+    robot_rotate(180);
+    delay(1000);
 //  robot_forward_and_release();
 //  robot_stop(); */
+
+  // The code below are just used for robot Calibration. 
+  /*
+  robot_rotate(90);
+  delay(5000);
+  */
 }
 
 // Receive data from I2C
-void receiveData(int byteCount) {
+void receiveData(int byteCount) 
+{
   while (Wire.available()) {
     Serial.print("i:");
     Serial.println(i);
@@ -171,7 +184,6 @@ void receiveData(int byteCount) {
     }
   }
 }  
-
 
 void robot_rotate(double angle_degree)
 {
@@ -232,11 +244,12 @@ void robot_forward_and_release()
   grab_servo.write(SERVO_RELE_POS);
 }
 
+// Rotate the robot accurately based on the VL53L0x. When the sensor gets a minimum value, stop.
+// TODO: Need to refine the stop point and turn angle.
 void robot_sensor_rotate()
 {
   while(1)
   { 
-    
     lox.rangingTest(&VL53L0x_measure, false);               // pass in "true" to get debug data printout
     current_VL53L0x_measure = VL53L0x_measure.RangeMilliMeter;
     
@@ -251,7 +264,7 @@ void robot_sensor_rotate()
     {
       if(current_VL53L0x_measure > last_VL53L0x_measure)
       {
-        rotate_execute = false;
+        rotate_by_sensor = false;
         judge_next = false;
         break;  
       }        
@@ -262,11 +275,11 @@ void robot_sensor_rotate()
       judge_next = true;
     }
     
-    robot_rotate(5);
+    robot_rotate(ACCURATE_ROT_ANGLE);
     robot_stop();
     last_VL53L0x_measure = current_VL53L0x_measure;
   }
-  robot_rotate(-7);
+  robot_rotate(ACCURATE_ROT_CALI);
 }
 
 void robot_forward_and_grab()
