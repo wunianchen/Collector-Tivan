@@ -22,7 +22,8 @@
 #define SERVO_GRAB_POS        90                      // set the servo grab position
 #define SERVO_GRAB_DIST_MM    35                      // define the location to grab garbage, currently set 35 mm
 #define DELAY_PER_CYCLE       8000                    // measure the rotate degree, need to calibrate in the future
-
+#define ARRUCRATE_ROT         250                     // determine the distance of accurate rotation
+ 
 // I2C
 #define SLAVE_ADDRESS         0x04
 
@@ -39,15 +40,19 @@ Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 
 // Read the distance measure from VL53L0x sensor
 VL53L0X_RangingMeasurementData_t VL53L0x_measure;
+int last_VL53L0x_measure = 10000;
+int current_VL53L0x_measure = 9999;
 
 // I2C
 char direct;
 char angle_exp = 'x';
 char last_angle_exp = 'x';
 bool accurate_control = false;
+bool rotate_execute = true;
+bool judge_next = false;
 double rotate_seq[] = {45, 22.5, 11.25, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625};
-int state = 0;
 int i;
+int state = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -84,10 +89,15 @@ void setup() {
 }
 
 void loop() {
-	if(direct == 'a' && accurate_control == true)
+  if(rotate_execute == true)
+  {
+    robot_sensor_rotate();
+  }
+/*	if(direct == 'a' && accurate_control == true)
 	{
     Serial.println("ACCURATE ADJUSTEMENT!!!");
 		robot_rotate(-double(angle_exp - '0'));
+    Serial.println("Shijing asked me to do this!!!");
     accurate_control = false;
 	}
 
@@ -127,7 +137,7 @@ void loop() {
     }
   } 
 
-  /*delay(1000);
+  delay(1000);
   delay(2000);
   robot_rotate(90);
   delay(1000);
@@ -161,6 +171,7 @@ void receiveData(int byteCount) {
     }
   }
 }  
+
 
 void robot_rotate(double angle_degree)
 {
@@ -221,6 +232,43 @@ void robot_forward_and_release()
   grab_servo.write(SERVO_RELE_POS);
 }
 
+void robot_sensor_rotate()
+{
+  while(1)
+  { 
+    
+    lox.rangingTest(&VL53L0x_measure, false);               // pass in "true" to get debug data printout
+    current_VL53L0x_measure = VL53L0x_measure.RangeMilliMeter;
+    
+    Serial.print("SENSOR VALUE:");
+    Serial.println(VL53L0x_measure.RangeMilliMeter);
+    Serial.print("LAST MEASURE:");
+    Serial.println(last_VL53L0x_measure);
+    Serial.print("CURRENT MEASURE:");
+    Serial.println(current_VL53L0x_measure);
+
+    if(judge_next)
+    {
+      if(current_VL53L0x_measure > last_VL53L0x_measure)
+      {
+        rotate_execute = false;
+        judge_next = false;
+        break;  
+      }        
+    }
+    
+    if((current_VL53L0x_measure > last_VL53L0x_measure)&&(judge_next==false))
+    {
+      judge_next = true;
+    }
+    
+    robot_rotate(5);
+    robot_stop();
+    last_VL53L0x_measure = current_VL53L0x_measure;
+  }
+  robot_rotate(-7);
+}
+
 void robot_forward_and_grab()
 {  
   while(1)
@@ -234,7 +282,7 @@ void robot_forward_and_grab()
     else
     {
       Serial.println("Out of Range!");  
-    }
+    } 
     
     L_Motor -> run(FORWARD);
     R_Motor -> run(FORWARD);
