@@ -133,7 +133,7 @@ while (keep_processing):
     track_window = cv2.selectROI(undistorted_rectifiedL, False)
     c,r,w,h      = track_window
     
-    number = 5
+    number = 10
     rst = np.zeros((1,number))
     angle_rst = np.zeros((1,number))
     for i in range(number):
@@ -180,7 +180,7 @@ while (keep_processing):
     final_angle = int(abs(90 - np.mean(angle_rst)))
     #final_angle = 5;
     print('final angle: ', final_angle)
-    send2uno('a', final_angle)
+    # send2uno('a', final_angle)
     
     
     if (key == ord('x')):
