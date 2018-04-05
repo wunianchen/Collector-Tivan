@@ -14,8 +14,9 @@ bus = smbus.SMBus(1)
 address = 0x04
 
 
-def send2uno(angle):
-    data_list = list(str(data))
+def send2uno(direction, num):
+    data = direction+str(num)
+    data_list = list(data)
     print(data_list)
     for i in data_list:
     	#Sends to the Slaves 
@@ -44,8 +45,8 @@ def normalize(im):
 
 # define video capture object
 
-camR = cv2.VideoCapture(0);
-camL = cv2.VideoCapture(1);
+camL = cv2.VideoCapture(0);
+camR = cv2.VideoCapture(1);
 
 # define display window names
 
@@ -108,18 +109,26 @@ while (keep_processing):
             print('release')
             keep_processing = False;
             break
+        elif (key == ord('s')):
+            # swap the cameras if specified
+            tmp = camL;
+            camL = camR;
+            camR = tmp;
     
     camL.grab();
     camR.grab();
 
     ret, frameL = camL.retrieve();
     ret, frameR = camR.retrieve();
-
+    
+    cv2.imwrite('L.png', frameL)
+    cv2.imwrite('R.png', frameR)
+    
     undistorted_rectifiedL = cv2.remap(frameL, mapL1, mapL2, cv2.INTER_LINEAR);
     undistorted_rectifiedR = cv2.remap(frameR, mapR1, mapR2, cv2.INTER_LINEAR);
     
-    cv2.imwrite('L.png', undistorted_rectifiedL)
-    cv2.imwrite('R.png', undistorted_rectifiedR)
+    cv2.imwrite('rectifiedL.png', undistorted_rectifiedL)
+    cv2.imwrite('rectifiedR.png', undistorted_rectifiedR)
     
     track_window = cv2.selectROI(undistorted_rectifiedL, False)
     c,r,w,h      = track_window
@@ -169,8 +178,9 @@ while (keep_processing):
     final = to_cm(np.mean(reject_outliers(rst, 1.5)))
     print('final distance: ', final)
     final_angle = int(abs(90 - np.mean(angle_rst)))
+    #final_angle = 5;
     print('final angle: ', final_angle)
-    #send2uno(final_angle)
+    # send2uno('a', final_angle)
     
     
     if (key == ord('x')):
