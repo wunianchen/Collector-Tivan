@@ -48,18 +48,24 @@ int last_VL53L0x_measure = 10000;
 int current_VL53L0x_measure = 9999;
 
 // I2C
-char direct;
-char angle_exp = 'x';
-char last_angle_exp = 'x';
+char ctrl_byte;
+char data_byte = 'x';
+char last_data_byte = 'x';
 
 // Accurate control variable
-bool accurate_control = false;                                                          // waiting the result from CV. TODO: redefine this.
+bool received_flag = false;                                                          // waiting the result from CV. TODO: redefine this.
 bool rotate_by_sensor = true;                                                             // when the flag is true, keep doing accurate rotate by sensor
 bool judge_next = false;                                                                // used in accurate rotate by sensor to decide when rotate stop
-double rotate_seq[] = {45, 22.5, 11.25, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625};      // define the robot rotate degree sequence by using tracking algorithm
+//double rotate_seq[] = {45, 22.5, 11.25, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625};      // define the robot rotate degree sequence by using tracking algorithm
+double rotate_seq[] = {36, 18, 9, 4.5, 2.25, 2.25, 2.25, 2.25, 2.25};
 
 int i;
 int state = 0;
+
+//variables of stereo
+int dist_i = 0;
+int dist_buffer = 0;
+int distance = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -96,91 +102,99 @@ void setup() {
 }
 
 void loop() {
+  /*
+  // 1. angle adjustment by tracking
+  if((ctrl_byte == 'l' || ctrl_byte == 'r' || ctrl_byte == 'c') && (last_data_byte != data_byte) && received_flag == true )
+  {
+    Serial.println("step1");
+    Serial.print("Last Angle:");
+    Serial.println(last_data_byte);
+    Serial.print("Current Angle:");
+    Serial.println(data_byte);
+     
+    last_data_byte = data_byte;
+    
+    if(ctrl_byte == 'l')
+    {
+      Serial.println("Turn LEFT!!!");
+      //Serial.print("TURN DEGREE:");
+      //Serial.println(data_byte -'0');
+      robot_rotate(rotate_seq[int(data_byte -'0')-1]);
+    }
+
+    if(ctrl_byte == 'r')
+    {
+      Serial.println("Turn RIGHT!!!");
+      //Serial.print("TURN DEGREE:");
+      //Serial.println(data_byte -'0');
+      robot_rotate(-rotate_seq[int(data_byte -'0')-1]);
+    }
+
+    if(ctrl_byte == 'c')
+    {
+      //robot_forward_and_grab(); 
+      //robot_forward_and_release();
+      robot_stop();
+    }
+  }
+  
+  // 2. angle adjustment by stereo
+  else if(ctrl_byte == 'a' && received_flag == true)
+  {
+    Serial.println("ACCURATE ADJUSTEMENT!!!");
+    robot_rotate(double(data_byte - '0'));//use left camera to detect & tracking
+    received_flag = false;
+  }
+  
+  // 3. receive distance
+  else if(ctrl_byte == 'd' && received_flag == true)
+  {
+    dist_i++;
+    //Serial.print("dist_i:");
+    //Serial.println(dist_i);
+    dist_buffer = dist_buffer*10 + (data_byte - '0');
+    if(dist_i == 3)
+    {
+      dist_i = 0;
+      distance = dist_buffer;
+      Serial.print("final distance:");
+      Serial.println(distance);
+      dist_buffer = 0;
+    } 
+    received_flag = false;
+  }
+*/
+  // 4. angle adjustment by distance sensor
   if(rotate_by_sensor == true)
   {
     robot_sensor_rotate();
   }
-/*	if(direct == 'a' && accurate_control == true)
-	{
-    Serial.println("ACCURATE ADJUSTEMENT!!!");
-		robot_rotate(-double(angle_exp - '0'));
-    accurate_control = false;
-	}
-
-  else if((direct == 'l' || direct == 'r' || direct == 'c') && (last_angle_exp != angle_exp))
- // if(last_angle_exp != angle_exp)
-  {
-    Serial.print("Last Angle:");
-    Serial.println(last_angle_exp);
-    Serial.print("Current Angle:");
-    Serial.println(angle_exp);
-     
-    last_angle_exp = angle_exp;
-    
-    if(direct == 'l')
-    {
-      Serial.println("Turn LEFT!!!");
-      Serial.print("TURN DEGREE:");
-      Serial.println(angle_exp -'0');
-      //robot_rotate(90/pow(2, double(angle_exp -'0')));
-      robot_rotate(rotate_seq[int(angle_exp -'0')-1]);
-    }
-
-    if(direct == 'r')
-    {
-      Serial.println("Turn RIGHT!!!");
-      Serial.print("TURN DEGREE:");
-      Serial.println(angle_exp -'0');
-      //robot_rotate(-90/pow(2, double(angle_exp -'0')));
-      robot_rotate(-rotate_seq[int(angle_exp -'0')-1]);
-    }
-
-    if(direct == 'c')
-    {
-      robot_forward_and_grab(); 
-      //robot_forward_and_release();
-      robot_stop();
-    }
-  } 
-
-  delay(1000);
-  delay(2000);
-  robot_rotate(90);
-  delay(1000);
-//  robot_forward_and_grab();
-//  delay(1000);
-    robot_rotate(180);
-    delay(1000);
-//  robot_forward_and_release();
-//  robot_stop(); */
 
   // The code below are just used for robot Calibration. 
-  /*
-  robot_rotate(90);
-  delay(5000);
-  */
+  
+// robot_rotate(90);
+// delay(5000);
+  
 }
 
 // Receive data from I2C
 void receiveData(int byteCount) 
 {
   while (Wire.available()) {
-    Serial.print("i:");
-    Serial.println(i);
     if(i == 0)
     {
-      direct = Wire.read();
+      ctrl_byte = Wire.read();
       i++;
-      Serial.print("READ DIRECT:");
-      Serial.println(direct);
+      Serial.print("READ ctrl_byte:");
+      Serial.println(ctrl_byte);
     }
     else if(i == 1)
     {
-      angle_exp = Wire.read();
+      data_byte = Wire.read();
       i--;
-      accurate_control = true;  
-      Serial.print("READ ANGLE_EXP:");
-      Serial.println(angle_exp);
+      received_flag = true;  
+      Serial.print("READ data_byte:");
+      Serial.println(data_byte);
     }
   }
 }  
@@ -195,8 +209,6 @@ void robot_rotate(double angle_degree)
       R_Motor -> run(BACKWARD);
       L_Motor -> setSpeed(ROT_SPEED);
       R_Motor -> setSpeed(ROT_SPEED);
-      double test = angle_degree * DELAY_PER_CYCLE;
-      //Serial.println(test);
       double delay_time = ((angle_degree/360) * DELAY_PER_CYCLE);
       Serial.print("angle degree is:");
       Serial.println(angle_degree);
@@ -215,8 +227,6 @@ void robot_rotate(double angle_degree)
       R_Motor -> run(FORWARD);
       L_Motor -> setSpeed(ROT_SPEED);
       R_Motor -> setSpeed(ROT_SPEED);
-      double test = angle_degree * DELAY_PER_CYCLE;
-      Serial.println(test);
       double delay_time = abs((angle_degree/360) * DELAY_PER_CYCLE);
       Serial.print("angle degree is:");
       Serial.println(angle_degree);
@@ -253,13 +263,12 @@ void robot_sensor_rotate()
     lox.rangingTest(&VL53L0x_measure, false);               // pass in "true" to get debug data printout
     current_VL53L0x_measure = VL53L0x_measure.RangeMilliMeter;
     
-    Serial.print("SENSOR VALUE:");
-    Serial.println(VL53L0x_measure.RangeMilliMeter);
     Serial.print("LAST MEASURE:");
     Serial.println(last_VL53L0x_measure);
     Serial.print("CURRENT MEASURE:");
     Serial.println(current_VL53L0x_measure);
-
+    delay(1000);
+/*
     if(judge_next)
     {
       if(current_VL53L0x_measure > last_VL53L0x_measure)
@@ -279,7 +288,8 @@ void robot_sensor_rotate()
     robot_stop();
     last_VL53L0x_measure = current_VL53L0x_measure;
   }
-  robot_rotate(ACCURATE_ROT_CALI);
+  robot_rotate(ACCURATE_ROT_CALI);*/
+  }
 }
 
 void robot_forward_and_grab()
