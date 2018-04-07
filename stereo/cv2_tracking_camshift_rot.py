@@ -118,11 +118,11 @@ while 1:
 
     ret, frameL = camL.retrieve();
     ret, frameR = camR.retrieve();
-    undistorted_rectifiedL = cv2.remap(frameL, mapL1, mapL2, cv2.INTER_LINEAR);
+    frameL = cv2.remap(frameL, mapL1, mapL2, cv2.INTER_LINEAR);
 
     # setup initial location of window
-    track_window = cv2.selectROI(undistorted_rectifiedL, False)
-    c,r,w,h      = track_window
+    track_window = cv2.selectROI(frameL, False)
+    c,r,w,h      = [int(track_window[v]) for v in range(4)]
     track_window = tuple([c,r,w,h])
     track_loop   = 1
     print(track_window)
@@ -137,7 +137,7 @@ while 1:
     term_crit = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1 )
     rot_num   = 1
     send_msg_ok = 1
-    msg_count = 30
+    msg_count = 25
     while(1):
         pts_vec = np.zeros([4,2])
         for i in range(track_loop):
@@ -153,6 +153,7 @@ while 1:
                 ret, track_window = cv2.CamShift(dst, track_window, term_crit)
                 pts = cv2.boxPoints(ret)
                 pts_vec = pts_vec+pts
+                #print('pts',pts)
             else:
                 break
         # Draw it on imagep
@@ -165,6 +166,8 @@ while 1:
         if (cpts[0] < cols/2-20):
             cv2.putText(img2, 'left',cpts,cv2.FONT_HERSHEY_SIMPLEX,1,(125, 255, 51), 2, cv2.LINE_AA)
             if (msg_count == 30 and send_msg_ok==1):
+                print('cpts[0]',cpts[0])
+                print(cols/2)
                 send2uno('l',rot_num)
                 msg_count = 0
                 if (rot_num == 9):
@@ -174,6 +177,8 @@ while 1:
         elif (cpts[0] > cols/2+20):
             cv2.putText(img2, 'right',cpts,cv2.FONT_HERSHEY_SIMPLEX,1,(125, 255, 51), 2, cv2.LINE_AA)
             if (msg_count == 30 and send_msg_ok==1):
+                print('cpts[0]',cpts[0])
+                print(cols/2)
                 send2uno('r',rot_num)
                 msg_count = 0
                 if (rot_num == 9):
@@ -250,7 +255,7 @@ while 1:
         
         cv2.imshow(windowNameL, undistorted_rectifiedL);
         cv2.imshow(windowNameR, undistorted_rectifiedR);
-        cv2.imshow(windowNameD, disparity_scaled[(cpts[1]-h1):(cpts[1]+h1), (cpts[0]-w1):(cpts[0]+w1)]);
+        cv2.imshow(windowNameD, disparity_scaled);
         key = cv2.waitKey(40) & 0xFF;
 
     final = int(to_cm(np.mean(reject_outliers(rst, 1.5))))
