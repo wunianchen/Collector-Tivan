@@ -21,7 +21,7 @@
 #define SERVO_RELE_POS        150                     // set the servo release position
 #define SERVO_GRAB_POS        90                      // set the servo grab position
 #define SERVO_GRAB_DIST_MM    35                      // define the location to grab garbage, currently set 35 mm
-#define DELAY_PER_CYCLE       8000                    // measure the rotate degree, need to calibrate in the future
+#define DELAY_PER_CYCLE       6800                    // measure the rotate degree, need to calibrate in the future
  
 // Constant for I2C between Rpi and Arduino
 #define SLAVE_ADDRESS         0x04
@@ -54,10 +54,10 @@ char last_data_byte = 'x';
 
 // Accurate control variable
 bool received_flag = false;                                                          // waiting the result from CV. TODO: redefine this.
-bool rotate_by_sensor = true;                                                             // when the flag is true, keep doing accurate rotate by sensor
+bool rotate_by_sensor = false;                                                             // when the flag is true, keep doing accurate rotate by sensor
 bool judge_next = false;                                                                // used in accurate rotate by sensor to decide when rotate stop
 //double rotate_seq[] = {45, 22.5, 11.25, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625};      // define the robot rotate degree sequence by using tracking algorithm
-double rotate_seq[] = {36, 18, 9, 4.5, 2.25, 2.25, 2.25, 2.25, 2.25};
+double rotate_seq[] = {30, 15, 7.5, 3.75, 1.875, 1.875, 1.875, 1.875, 1.875, 1.875};
 
 int i;
 int state = 0;
@@ -66,6 +66,7 @@ int state = 0;
 int dist_i = 0;
 int dist_buffer = 0;
 int distance = 0;
+bool dist_get = false;
 
 void setup() {
   Serial.begin(115200);
@@ -73,8 +74,8 @@ void setup() {
 
   // Motor & Servo initialization
   AFMS.begin();                                                  // create with the default frequency 1.6 KHz.
-  grab_servo.attach(SERVO_ATTACH_PIN);                              
-  grab_servo.write(SERVO_RELE_POS);                    
+  //grab_servo.attach(SERVO_ATTACH_PIN);                              
+  //grab_servo.write(SERVO_RELE_POS);                    
 
   // Turn on left motor
   L_Motor -> setSpeed(INIT_SPEED);
@@ -102,7 +103,7 @@ void setup() {
 }
 
 void loop() {
-  /*
+ 
   // 1. angle adjustment by tracking
   if((ctrl_byte == 'l' || ctrl_byte == 'r' || ctrl_byte == 'c') && (last_data_byte != data_byte) && received_flag == true )
   {
@@ -160,20 +161,28 @@ void loop() {
       Serial.print("final distance:");
       Serial.println(distance);
       dist_buffer = 0;
+      dist_get = true;
     } 
     received_flag = false;
   }
-*/
-  // 4. angle adjustment by distance sensor
+
+  // 4. robot run
+  if(dist_get == true)
+  {
+    robot_forward(distance);
+    dist_get = false;
+  }
+
+  // 5. angle adjustment by distance sensor
   if(rotate_by_sensor == true)
   {
     robot_sensor_rotate();
-  }
+  } 
 
   // The code below are just used for robot Calibration. 
   
-// robot_rotate(90);
-// delay(5000);
+ //robot_rotate(180);
+ //delay(5000);
   
 }
 
@@ -321,3 +330,13 @@ void robot_forward_and_grab()
     }
   }
 }
+
+void robot_forward(int distance)
+{
+  L_Motor -> run(FORWARD);
+  R_Motor -> run(FORWARD);
+  L_Motor -> setSpeed(F_SPEED);
+  R_Motor -> setSpeed(F_SPEED);
+  delay(1000);//TODO:need to be calculate
+}
+
