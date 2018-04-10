@@ -59,6 +59,7 @@ bool judge_next = false;                                                        
 //double rotate_seq[] = {45, 22.5, 11.25, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625};      // define the robot rotate degree sequence by using tracking algorithm
 //double rotate_seq[] = {20, 15, 7.5, 3.75, 1.875, 1.875, 1.875, 1.875, 1.875, 1.875};
 double rotate_seq[] = {10, 8, 5, 3, 1.875, 1.875, 1.875, 1.875, 1.875, 1.875};
+double rotate_det[] = {30,-60};
 
 int i;
 int state = 0;
@@ -108,6 +109,21 @@ void setup() {
 
 void loop() {
 
+  // if not detect anything
+  if(ctrl_byte == 'n' && received_flag == true)
+  {
+    robot_rotate(rotate_det[int(data_byte -'0')-1]);
+    received_flag = false;
+  }
+
+  // go back
+  if(ctrl_byte == 'n' && received_flag == true)
+  {
+    robot_mov(1,forward_dist);//robot_forward
+    grab_servo.write(SERVO_RELE_POS);
+    received_flag = false;
+  }
+  
   // 1. angle adjustment by tracking
   if((ctrl_byte == 'l' || ctrl_byte == 'r' || ctrl_byte == 'c') && (last_data_byte != data_byte) && received_flag == true )
   {
@@ -174,7 +190,7 @@ void loop() {
     //Serial.print("final distance:");
     //Serial.println("step4, robot run to the target object");
     delay(1000);
-    forward_dist = int(distance - 20);
+    forward_dist = int(distance - 25);
     Serial.print("forward distance:");
     Serial.println(forward_dist);
     robot_mov(1,forward_dist);//robot_forward
@@ -182,7 +198,7 @@ void loop() {
     //robot_forward(forward_dist);
     dist_get = false;
     rotate_by_sensor = true;
-  }
+  }                                                            
 
   // 5. angle adjustment by distance sensor
   if(rotate_by_sensor == true)
@@ -193,23 +209,24 @@ void loop() {
     robot_mov(2,0);//robot_sensor_rotate
     delay(1000);
     robot_mov(3,0);//robot_forward_and_grab
-    //robot_forward_and_grab();
+    robot_mov(4,distance);
   } 
- 
+
 /*
   delay(1000);
   // robot calibration
   if(temp==1)
   {
     //robot_sensor_rotate();
-    //robot_rotate(360);
+    robot_rotate(360);
     //robot_mov(1,1); 
-    robot_mov(3,0);                      
+    //robot_mov(3,0);
+    //robot_mov(4,0);                      
     temp = 0;
   }
- */
+*/
   
-  
+
 }
 
 // Receive data from I2C
@@ -279,24 +296,50 @@ void robot_stop()
   R_Motor -> run(RELEASE);  
 }
 
-void robot_forward_and_release()
+
+
+//******mode select
+void robot_mov(int mode,int distance)
 {
-  L_Motor -> run(BACKWARD);
-  R_Motor -> run(BACKWARD);
-  L_Motor -> setSpeed(F_SPEED);
-  R_Motor -> setSpeed(F_SPEED);  
-  delay(10000);												// TODO: need to refine this part
-  grab_servo.write(SERVO_RELE_POS);
+  if(mode==1)
+  {
+    robot_forward(distance);
+  }
+  else if(mode==2)
+  {
+    robot_sensor_rotate();
+  }
+  else if(mode==3)
+  {
+    robot_forward_and_grab();
+  }
+  else if(mode==4)
+  {
+    robot_back(distance);
+  }
 }
 
-// Rotate the robot accurately based on the VL53L0x. When the sensor gets a minimum value, stop.
-// TODO: Need to refine the stop point and turn angle.
+//**************mode 1
+void robot_forward(int distance)
+{
+  
+  L_Motor -> run(FORWARD);
+  R_Motor -> run(FORWARD);
+  L_Motor -> setSpeed(F_SPEED);
+  R_Motor -> setSpeed(F_SPEED);
+  double delay_t = double(distance) / 67.5 *4000;
+  delay(delay_t);//67.5cm --> 4000ms
+  //delay(4000);
+  robot_stop();
+}
+
+//**************mode 2
 void robot_sensor_rotate()
 {
   
   while(1)
   { 
-    lox.rangingTest(&VL53L0x_measure, false);               // pass in "true" to get debug data printout    ---------------------------------------bug
+    lox.rangingTest(&VL53L0x_measure, false);               // pass in "true" to get debug data printout    
     current_dist_measure = VL53L0x_measure.RangeMilliMeter;
     
     Serial.print("LAST MEASURE:");
@@ -314,23 +357,18 @@ void robot_sensor_rotate()
         break;  
       }        
     }
-    
     if((current_dist_measure > last_dist_measure)&&(judge_next==false))
     {
       judge_next = true;
     }
-    
     robot_rotate(ACCURATE_ROT_ANGLE);
     robot_stop();
     last_dist_measure = current_dist_measure;
   }
-  
   robot_rotate(ACCURATE_ROT_CALI);
-
-  
 }
 
-
+//**************mode 3
 void robot_forward_and_grab()
 {  
   while(1)
@@ -361,33 +399,12 @@ void robot_forward_and_grab()
   }
 }
 
-void robot_forward(int distance)
+//**************mode 4
+void robot_back(int distance)
 {
-  
-  L_Motor -> run(FORWARD);
-  R_Motor -> run(FORWARD);
-  L_Motor -> setSpeed(F_SPEED);
-  R_Motor -> setSpeed(F_SPEED);
-  double delay_t = double(distance) / 67.5 *4000;
-  delay(delay_t);//67.5cm --> 4000ms
-  //delay(4000);
-  robot_stop();
-}
-
-void robot_mov(int mode,int distance)
-{
-  if(mode==1)
-  {
-    robot_forward(distance);
-  }
-  else if(mode==2)
-  {
-    robot_sensor_rotate();
-  }
-  else if(mode==3)
-  {
-    robot_forward_and_grab();
-    //robot_stop();
-  }
+  robot_rotate(180);
+  //robot_forward(distance);
+  //robot_forward(10);
+  //grab_servo.write(SERVO_RELE_POS);
 }
 
