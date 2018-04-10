@@ -19,27 +19,27 @@ def find_file(pattern,path):
             if fnmatch.fnmatch(name, pattern):
                 result.append(os.path.join(root, name))
     return result
-	
+    
 def plot_image_box_label(img,out_dict):
-	for key in out_dict:
-		for vec in out_dict[key]:
-			y      = vec[0] ; x     = vec[1]
-			bottom = vec[2] ; right = vec[3]
-			score  = vec[4]
-			cv2.putText(img, key+' '+str(score)+'%',(int(x), int(y)),cv2.FONT_HERSHEY_SIMPLEX,1,(125, 255, 51), 2, cv2.LINE_AA)
-			cv2.rectangle(img, (x, y), (right, bottom), (125, 255, 51), thickness=2)
-	cv2.imshow('Object Detection', img)
-	return
+    for key in out_dict:
+        for vec in out_dict[key]:
+            y      = vec[0] ; x     = vec[1]
+            bottom = vec[2] ; right = vec[3]
+            score  = vec[4]
+            cv2.putText(img, key+' '+str(score)+'%',(int(x), int(y)),cv2.FONT_HERSHEY_SIMPLEX,1,(125, 255, 51), 2, cv2.LINE_AA)
+            cv2.rectangle(img, (x, y), (right, bottom), (125, 255, 51), thickness=2)
+    cv2.imshow('Object Detection', img)
+    return
 
 def ExtractROI (objectId,out_dict):
-	for vec in out_dict[objectId]:
-		left   = vec[1] ; top    = vec[0]
-		right  = vec[3] ; bottom = vec[2]
-		c = left ; w = right - left
-		r = top  ; h = bottom - top
-		break
-	track_window = (c,r,w,h)
-	return track_window
+    for vec in out_dict[objectId]:
+        left   = vec[1] ; top    = vec[0]
+        right  = vec[3] ; bottom = vec[2]
+        c = left ; w = right - left
+        r = top  ; h = bottom - top
+        break
+    track_window = (c,r,w,h)
+    return track_window
 
 # Detection path
 PATH_TO_SHR = 'Share/'
@@ -159,7 +159,7 @@ while 1:
 
     ret, frameL = camL.retrieve();
     ret, frameR = camR.retrieve();
-	
+    
     while 1:
         input_name = input('What is the function (Manual-ROI,Auto-Detect,Self-Select)?')
         if (input_name == 'Auto-Detect'):
@@ -171,8 +171,8 @@ while 1:
             func_code = 0
             cap_det = False
             break
-	elif (input_name == 'Manual-ROI'):
-	    func_code = 2
+        elif (input_name == 'Manual-ROI'):
+            func_code = 2
             cap_det = True
 
     ############ Detection ###################
@@ -221,12 +221,12 @@ while 1:
                 print('Failed')
                 break
 
-	######################### Tracking ################################
+    ######################### Tracking ################################
     # setup initial location of window
-	if (func_code == 2):
-    	track_window = ExtractROI(obj_name,out_dict)
-	else:
-		track_window = cv2.selectROI(frameL, False)
+    if (func_code == 2):
+        track_window = ExtractROI(obj_name,out_dict)
+    else:
+        track_window = cv2.selectROI(frameL, False)
     c,r,w,h      = [int(track_window[v]) for v in range(4)]
     track_window = tuple([c,r,w,h])
     track_loop   = 1
@@ -301,7 +301,7 @@ while 1:
         if k == 27:
             break
 
-	###########################Stereo ###############################################
+    ###########################Stereo ###############################################
     
     for i in range(50):
         camL.grab();
