@@ -20,8 +20,8 @@
 #define F_STOP                0                       // set the stop speed
 #define SERVO_RELE_POS        150                     // set the servo release position
 #define SERVO_GRAB_POS        90                      // set the servo grab position
-#define SERVO_GRAB_DIST_MM    35                      // define the location to grab garbage, currently set 35 mm
-#define DELAY_PER_CYCLE       6800                    // measure the rotate degree, need to calibrate in the future
+#define SERVO_GRAB_DIST_MM    70                      // define the location to grab garbage, currently set 35 mm
+#define DELAY_PER_CYCLE       5800                    // measure the rotate degree, need to calibrate in the future
  
 // Constant for I2C between Rpi and Arduino
 #define SLAVE_ADDRESS         0x04
@@ -44,8 +44,8 @@ Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 
 // Read the distance measure from VL53L0x sensor
 VL53L0X_RangingMeasurementData_t VL53L0x_measure;
-int last_VL53L0x_measure = 10000;
-int current_VL53L0x_measure = 9999;
+int last_dist_measure = 10000;
+int current_dist_measure = 9999;
 
 // I2C
 char ctrl_byte;
@@ -57,7 +57,8 @@ bool received_flag = false;                                                     
 bool rotate_by_sensor = false;                                                             // when the flag is true, keep doing accurate rotate by sensor
 bool judge_next = false;                                                                // used in accurate rotate by sensor to decide when rotate stop
 //double rotate_seq[] = {45, 22.5, 11.25, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625};      // define the robot rotate degree sequence by using tracking algorithm
-double rotate_seq[] = {30, 15, 7.5, 3.75, 1.875, 1.875, 1.875, 1.875, 1.875, 1.875};
+//double rotate_seq[] = {20, 15, 7.5, 3.75, 1.875, 1.875, 1.875, 1.875, 1.875, 1.875};
+double rotate_seq[] = {10, 8, 5, 3, 1.875, 1.875, 1.875, 1.875, 1.875, 1.875};
 
 int i;
 int state = 0;
@@ -67,6 +68,9 @@ int dist_i = 0;
 int dist_buffer = 0;
 int distance = 0;
 bool dist_get = false;
+int forward_dist = 0;
+
+int temp = 1;
 
 void setup() {
   Serial.begin(115200);
@@ -74,8 +78,8 @@ void setup() {
 
   // Motor & Servo initialization
   AFMS.begin();                                                  // create with the default frequency 1.6 KHz.
-  //grab_servo.attach(SERVO_ATTACH_PIN);                              
-  //grab_servo.write(SERVO_RELE_POS);                    
+  grab_servo.attach(SERVO_ATTACH_PIN);                              
+  grab_servo.write(SERVO_RELE_POS);                    
 
   // Turn on left motor
   L_Motor -> setSpeed(INIT_SPEED);
@@ -88,7 +92,7 @@ void setup() {
   // Motor & Servo initialization ends
 
   // VL53L0 sensor initialization 
-  if(!lox.begin())
+  if(!lox.begin(0x30))
   {
     Serial.println("Failed to boot VL53L0X");
     while(1);
@@ -103,11 +107,11 @@ void setup() {
 }
 
 void loop() {
- 
+
   // 1. angle adjustment by tracking
   if((ctrl_byte == 'l' || ctrl_byte == 'r' || ctrl_byte == 'c') && (last_data_byte != data_byte) && received_flag == true )
   {
-    Serial.println("step1");
+    //Serial.println("step1");
     Serial.print("Last Angle:");
     Serial.println(last_data_byte);
     Serial.print("Current Angle:");
@@ -118,16 +122,12 @@ void loop() {
     if(ctrl_byte == 'l')
     {
       Serial.println("Turn LEFT!!!");
-      //Serial.print("TURN DEGREE:");
-      //Serial.println(data_byte -'0');
       robot_rotate(rotate_seq[int(data_byte -'0')-1]);
     }
 
     if(ctrl_byte == 'r')
     {
       Serial.println("Turn RIGHT!!!");
-      //Serial.print("TURN DEGREE:");
-      //Serial.println(data_byte -'0');
       robot_rotate(-rotate_seq[int(data_byte -'0')-1]);
     }
 
@@ -140,15 +140,15 @@ void loop() {
   }
   
   // 2. angle adjustment by stereo
-  else if(ctrl_byte == 'a' && received_flag == true)
+  if(ctrl_byte == 'a' && received_flag == true)
   {
     Serial.println("ACCURATE ADJUSTEMENT!!!");
     robot_rotate(double(data_byte - '0'));//use left camera to detect & tracking
     received_flag = false;
   }
-  
+ 
   // 3. receive distance
-  else if(ctrl_byte == 'd' && received_flag == true)
+  if(ctrl_byte == 'd' && received_flag == true)
   {
     dist_i++;
     //Serial.print("dist_i:");
@@ -166,23 +166,49 @@ void loop() {
     received_flag = false;
   }
 
+
+
   // 4. robot run
   if(dist_get == true)
   {
-    robot_forward(distance);
+    //Serial.print("final distance:");
+    //Serial.println("step4, robot run to the target object");
+    delay(1000);
+    forward_dist = int(distance - 20);
+    Serial.print("forward distance:");
+    Serial.println(forward_dist);
+    robot_mov(1,forward_dist);//robot_forward
+    
+    //robot_forward(forward_dist);
     dist_get = false;
+    rotate_by_sensor = true;
   }
 
   // 5. angle adjustment by distance sensor
   if(rotate_by_sensor == true)
   {
-    robot_sensor_rotate();
+    //Serial.print("final distance:");
+    //Serial.println("step5: angle adjustment by sensor");
+    delay(1000);
+    robot_mov(2,0);//robot_sensor_rotate
+    delay(1000);
+    robot_mov(3,0);//robot_forward_and_grab
+    //robot_forward_and_grab();
   } 
-
-  // The code below are just used for robot Calibration. 
+ 
+/*
+  delay(1000);
+  // robot calibration
+  if(temp==1)
+  {
+    //robot_sensor_rotate();
+    //robot_rotate(360);
+    //robot_mov(1,1); 
+    robot_mov(3,0);                      
+    temp = 0;
+  }
+ */
   
- //robot_rotate(180);
- //delay(5000);
   
 }
 
@@ -210,38 +236,38 @@ void receiveData(int byteCount)
 
 void robot_rotate(double angle_degree)
 {
-    // If angle degree is greater than 0, turn right.
+    // If angle degree is greater than 0, turn left.
     // Left motor: FORWARD. right motor: BACKWARD.
-    if(angle_degree > 0)
+    if(angle_degree > 0) 
     {
       L_Motor -> run(FORWARD);
       R_Motor -> run(BACKWARD);
       L_Motor -> setSpeed(ROT_SPEED);
       R_Motor -> setSpeed(ROT_SPEED);
       double delay_time = ((angle_degree/360) * DELAY_PER_CYCLE);
-      Serial.print("angle degree is:");
-      Serial.println(angle_degree);
-      Serial.print("Delay Time is:");
-      Serial.println(delay_time);
-      Serial.println("****************");
+      //Serial.print("angle degree is:");
+      //Serial.println(angle_degree);
+      //Serial.print("Delay Time is:");
+      //Serial.println(delay_time);
+      //Serial.println("****************");
       delay(delay_time);
       robot_stop();
     }
     
-    // If angle degree is smaller than 0, turn left.
+    // If angle degree is smaller than 0, turn right.
     // Left motor: BACKWARD. right motor: FORWARD.
-    if(angle_degree < 0)
+    if(angle_degree < 0) 
     {
       L_Motor -> run(BACKWARD);
       R_Motor -> run(FORWARD);
       L_Motor -> setSpeed(ROT_SPEED);
       R_Motor -> setSpeed(ROT_SPEED);
       double delay_time = abs((angle_degree/360) * DELAY_PER_CYCLE);
-      Serial.print("angle degree is:");
-      Serial.println(angle_degree);
-      Serial.print("Delay Time is:");
-      Serial.println(delay_time);
-      Serial.println("****************");
+      //Serial.print("angle degree is:");
+      //Serial.println(angle_degree);
+      //Serial.print("Delay Time is:");
+      //Serial.println(delay_time);
+      //Serial.println("****************");
       delay(delay_time);
       robot_stop();
     }
@@ -267,20 +293,21 @@ void robot_forward_and_release()
 // TODO: Need to refine the stop point and turn angle.
 void robot_sensor_rotate()
 {
+  
   while(1)
   { 
-    lox.rangingTest(&VL53L0x_measure, false);               // pass in "true" to get debug data printout
-    current_VL53L0x_measure = VL53L0x_measure.RangeMilliMeter;
+    lox.rangingTest(&VL53L0x_measure, false);               // pass in "true" to get debug data printout    ---------------------------------------bug
+    current_dist_measure = VL53L0x_measure.RangeMilliMeter;
     
     Serial.print("LAST MEASURE:");
-    Serial.println(last_VL53L0x_measure);
+    Serial.println(last_dist_measure);
     Serial.print("CURRENT MEASURE:");
-    Serial.println(current_VL53L0x_measure);
-    delay(1000);
-/*
+    Serial.println(current_dist_measure);
+    //delay(1000);
+
     if(judge_next)
     {
-      if(current_VL53L0x_measure > last_VL53L0x_measure)
+      if(current_dist_measure > last_dist_measure)
       {
         rotate_by_sensor = false;
         judge_next = false;
@@ -288,18 +315,21 @@ void robot_sensor_rotate()
       }        
     }
     
-    if((current_VL53L0x_measure > last_VL53L0x_measure)&&(judge_next==false))
+    if((current_dist_measure > last_dist_measure)&&(judge_next==false))
     {
       judge_next = true;
     }
     
     robot_rotate(ACCURATE_ROT_ANGLE);
     robot_stop();
-    last_VL53L0x_measure = current_VL53L0x_measure;
+    last_dist_measure = current_dist_measure;
   }
-  robot_rotate(ACCURATE_ROT_CALI);*/
-  }
+  
+  robot_rotate(ACCURATE_ROT_CALI);
+
+  
 }
+
 
 void robot_forward_and_grab()
 {  
@@ -309,11 +339,12 @@ void robot_forward_and_grab()
 
     if(VL53L0x_measure.RangeStatus !=4)
     {
-      Serial.print("Distance (mm):"); Serial.println(VL53L0x_measure.RangeMilliMeter);  
+      Serial.print("Distance (mm):");
+      Serial.println(VL53L0x_measure.RangeMilliMeter);  
     }
     else
     {
-      Serial.println("Out of Range!");  
+      //Serial.println("Out of Range!");  
     } 
     
     L_Motor -> run(FORWARD);
@@ -323,8 +354,7 @@ void robot_forward_and_grab()
   
     if(VL53L0x_measure.RangeMilliMeter < SERVO_GRAB_DIST_MM)
     {
-      L_Motor -> run(RELEASE);
-      R_Motor -> run(RELEASE);
+      robot_stop();
       grab_servo.write(SERVO_GRAB_POS);
       break;
     }
@@ -333,10 +363,31 @@ void robot_forward_and_grab()
 
 void robot_forward(int distance)
 {
+  
   L_Motor -> run(FORWARD);
   R_Motor -> run(FORWARD);
   L_Motor -> setSpeed(F_SPEED);
   R_Motor -> setSpeed(F_SPEED);
-  delay(1000);//TODO:need to be calculate
+  double delay_t = double(distance) / 67.5 *4000;
+  delay(delay_t);//67.5cm --> 4000ms
+  //delay(4000);
+  robot_stop();
+}
+
+void robot_mov(int mode,int distance)
+{
+  if(mode==1)
+  {
+    robot_forward(distance);
+  }
+  else if(mode==2)
+  {
+    robot_sensor_rotate();
+  }
+  else if(mode==3)
+  {
+    robot_forward_and_grab();
+    //robot_stop();
+  }
 }
 
