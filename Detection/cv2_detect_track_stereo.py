@@ -233,7 +233,7 @@ while 1:
     track_loop   = 1
     print(track_window)
 
-    # set up the ROI for tracking
+    ## set up the ROI for tracking
     roi = frameL[r:r+h, c:c+w]
     hsv_roi =  cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(hsv_roi, np.array((0., 60.,32.)), np.array((180.,255.,255.)))
