@@ -174,6 +174,7 @@ while 1:
         elif (input_name == 'Manual-ROI'):
             func_code = 2
             cap_det = True
+            break
 
     ############ Detection ###################
     while (not cap_det):
@@ -223,7 +224,7 @@ while 1:
 
     ######################### Tracking ################################
     # setup initial location of window
-    if (func_code == 2):
+    if (func_code != 2):
         track_window = ExtractROI(obj_name,out_dict)
     else:
         track_window = cv2.selectROI(frameL, False)
@@ -242,14 +243,11 @@ while 1:
     term_crit = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1 )
     rot_num   = 1
     send_msg_ok = 1
-    msg_count = 10
+    msg_count = 25
     while(1):
         pts_vec = np.zeros([4,2])
         for i in range(track_loop):
-            camL.grab();
-            #camR.grab();
-            ret, frameL = camL.retrieve();
-            #ret, frameR = camR.retrieve();
+            ret, frameL = camL.read()
             if ret == True:
                 hsv = cv2.cvtColor(frameL, cv2.COLOR_BGR2HSV)
                 dst = cv2.calcBackProject([hsv],[0],roi_hist,[0,180],1)
@@ -266,6 +264,8 @@ while 1:
         # img2 = cv2.polylines(frame,[pts],True, 255,2)
         # Draw central points
         cpts = (int(pts[:,0].mean()),int(pts[:,1].mean()))
+        #print(cpts)
+        #exit()
         img2 = cv2.circle(frameL,cpts,10,255,-1)
         if (cpts[0] < cols/2-20):
             cv2.putText(img2, 'left',cpts,cv2.FONT_HERSHEY_SIMPLEX,1,(125, 255, 51), 2, cv2.LINE_AA)
