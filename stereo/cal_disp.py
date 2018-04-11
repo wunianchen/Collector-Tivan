@@ -9,11 +9,11 @@ import smbus
 import time
 
 # for RPI version 1, use "bus = smbus.SMBus(0)"
-bus = smbus.SMBus(1)
+#bus = smbus.SMBus(1)
 # This is the address we setup in the Arduino Program
-address = 0x04
+#address = 0x04
 
-
+"""
 def send2uno(direction, num):
     data = direction+str(num)
     data_list = list(data)
@@ -23,21 +23,21 @@ def send2uno(direction, num):
         bus.write_byte(address,int(ord(i)))
         time.sleep(.1)
     return 1
-
+"""
 
 def to_cm(x):
     return (0.1313*x - 3.8408)
 
 
 def reject_outliers(data, m):
-    data = data.reshape((1, data.shape[0]*data.shape[1]))
+    #data = data.reshape((1, data.shape[0]*data.shape[1]))
     return data[abs(data-np.mean(data)) < m * np.std(data)]
 
 
 def normalize(im):
-    #image_mean = np.mean(X, axis=(0,1,2))
-    #image_std = np.std(X, axis=(0,1,2))
-    #im = (X - image_mean) / image_std
+    #image_mean = np.mean(im, axis=(0,1,2))
+    #image_std = np.std(im, axis=(0,1,2))
+    #im = (im - image_mean) / image_std
     im = cv2.normalize(src=im, dst=im, beta=0, alpha=255, norm_type=cv2.NORM_MINMAX)
     im = np.uint8(im)
     return im
@@ -158,6 +158,7 @@ while (keep_processing):
         grayR = cv2.cvtColor(undistorted_rectifiedR,cv2.COLOR_BGR2GRAY);
 
         disparity_scaled = sgbm.disp_sgbm(grayL, grayR)
+        print('mean disp', np.mean(disparity_scaled[r:r+h, c:c+w]))
         cv2.imwrite(str(i)+'.png', disparity_scaled)
         
         points1 = cv2.reprojectImageTo3D(disparity_scaled, Q)
