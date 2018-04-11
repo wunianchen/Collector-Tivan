@@ -29,14 +29,21 @@ def plot_image_box_label(img,out_dict):
             cv2.putText(img, key+' '+str(score)+'%',(int(x), int(y)),cv2.FONT_HERSHEY_SIMPLEX,1,(125, 255, 51), 2, cv2.LINE_AA)
             cv2.rectangle(img, (x, y), (right, bottom), (125, 255, 51), thickness=2)
     cv2.imshow('Object Detection', img)
+    cv2.imwrite('detected.png', img)
     return
 
 def ExtractROI (objectId,out_dict):
+    #vec = sorted(out_dict[objectId],key = lambda x: int(x[4])) 
+    score_pre = 0
     for vec in out_dict[objectId]:
+        score = vec[4]
+        if (score < score_pre):
+            break
         left   = vec[1] ; top    = vec[0]
         right  = vec[3] ; bottom = vec[2]
         c = left ; w = right - left
         r = top  ; h = bottom - top
+        score_pre = score
         break
     track_window = (c,r,w,h)
     return track_window
@@ -65,7 +72,10 @@ def to_cm(x):
 
 
 def reject_outliers(data, m):
-    return data[abs(data-np.mean(data)) < m * np.std(data)]
+    new_data = data[abs(data-np.mean(data)) < m * np.std(data)]
+    if new_data.size == 0:
+        new_data = data
+    return np.mean(new_data)
 
 
 def normalize(im):
@@ -177,17 +187,21 @@ while 1:
             break
 
     ############ Detection ###################
+    try_time = 0
     while (not cap_det):
         # Capture image
         print('Capture image ......')
+        if (try_time > 0):
+            send2uno('n',try_time)
+            time.sleep(3)
         for i in range(5):
-            camL.grab();
-            ret, frameL = camL.retrieve();
+            ret, frameL = camL.read()
         cv2.imshow('Object Detection',frameL)
-        key = cv2.waitKey(0) & 0xFF
-        ret = cv2.imwrite(PATH_TO_SHR+'img0.jpg',frameL)
-        print(ret)
-        cv2.destroyAllWindows()
+        key = cv2.waitKey(500) & 0xFF
+        ret1 = cv2.imwrite(PATH_TO_SHR+'img0.jpg',frameL[120:480,0:480,:])
+        ret2 = cv2.imwrite(PATH_TO_SHR+'img1.jpg',frameL[120:480,160:640,:])
+        ret0 = cv2.imwrite(PATH_TO_SHR+'img2.jpg',frameL)
+        print(ret0 and ret1)
         # Detection
         print('Wait for detection ......')
         while(1):
@@ -196,19 +210,19 @@ while 1:
                 if (pkl_name[0] == 'Share/target.pkl'):
                     print(pkl_name)
                     pkl_file = open(pkl_name[0],'rb')
-                    ini_dict = pickle.load(pkl_file)
+                    out_dict = pickle.load(pkl_file)
                     break
             except:
                 continue
             time.sleep(0.5)
-        
-        out_dict = ini_dict
+            cv2.destroyAllWindows()
         print(out_dict)
         pkl_file.close()
         os.remove(pkl_name[0])
         print('Finish Detection ......')
-        plot_image_box_label(frameL,out_dict)
-        key = cv2.waitKey(0) & 0xFF
+        if (func_code == 0):
+            plot_image_box_label(frameL,out_dict)
+            key = cv2.waitKey(0) & 0xFF
         while True:
             if func_code == 0:
                 obj_name = input('What is the type of the target (or Retry)?')
@@ -219,6 +233,7 @@ while 1:
                 break
             else:
                 cv2.destroyAllWindows()
+                try_time = try_time + 1
                 print('Failed')
                 break
 
@@ -233,7 +248,7 @@ while 1:
     track_loop   = 1
     print(track_window)
 
-    ## set up the ROI for tracking
+    # set up the ROI for tracking
     roi = frameL[r:r+h, c:c+w]
     hsv_roi =  cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(hsv_roi, np.array((0., 60.,32.)), np.array((180.,255.,255.)))
@@ -292,6 +307,7 @@ while 1:
         else:
             cv2.putText(img2, 'center',cpts,cv2.FONT_HERSHEY_SIMPLEX,1,(125, 255, 51), 2, cv2.LINE_AA)
             if (msg_count == 30 and send_msg_ok==1):
+                #cv2.imwrite('tracking.png', img2)
                 send2uno('c',0)
                 send_msg_ok = 0
                 break
@@ -355,17 +371,17 @@ while 1:
         num_points = points.shape[0]*points.shape[1]
         points = points.reshape(num_points, points.shape[2])
         points2 = []
-        dlist = []
+        #dlist = []
         for n in range(num_points):
             if np.all(np.isfinite(points[n,:])):
                 points2.append(points[n,:])
-                dlist.append(points[n,2])
+                #dlist.append(points[n,2])
         points = np.array(points2)
-        dlist = np.array(dlist)
+        #dlist = np.array(dlist)
         
         coor = np.mean(points, axis=0)
         angle = np.degrees(np.arctan2(coor[2], coor[0]))
-        distance = np.mean(reject_outliers(dlist, 1.5))
+        distance = np.linalg.norm([coor[0],coor[2]])
         print('======',i)
         print(coor)
         print('angle: ', angle)
@@ -378,7 +394,7 @@ while 1:
         cv2.imshow(windowNameD, disparity_scaled);
         key = cv2.waitKey(40) & 0xFF;
 
-    final = int(to_cm(np.mean(reject_outliers(rst, 1.5))))
+    final = int(to_cm(reject_outliers(rst, 1.5)))
     print('final distance: ', final)
     final_angle = int(abs(90 - np.mean(angle_rst)))
     #final_angle = 5;
@@ -387,6 +403,148 @@ while 1:
     send2uno('d', int(final/100))
     send2uno('d', int((final%100)/10))
     send2uno('d', final%10)
+    key = cv2.waitKey() & 0xFF
+    if (key == 13):
+        cv2.destroyAllWindows()
+
+    ############### GO-BACK ###################
+    go_back = False
+    while True:
+        inst = input('Go back (Yes or No)?')
+        if (inst == 'Yes'):
+            go_back = True
+            break
+        elif (inst == 'No'):
+            break
+    
+    if go_back == True:
+        obj_name = 'Sign'
+        try_time = 0
+        cap_det  = False
+        while (not cap_det):
+            # Capture image
+            print('Capture image ......')
+            if (try_time > 0):
+                send2uno('m',try_time)
+                time.sleep(3)
+            for i in range(5):
+                ret, frameL = camL.read()
+            cv2.imshow('Object Detection',frameL)
+            key = cv2.waitKey(500) & 0xFF
+            ret1 = cv2.imwrite(PATH_TO_SHR+'img0.jpg',frameL[120:480,0:480,:])
+            ret2 = cv2.imwrite(PATH_TO_SHR+'img1.jpg',frameL[120:480,160:640,:])
+            ret0 = cv2.imwrite(PATH_TO_SHR+'img2.jpg',frameL)
+            print(ret0 and ret1 and ret2)
+            cv2.destroyAllWindows()
+            # Detection
+            print('Wait for detection ......')
+            while(1):
+                pkl_name = find_file('*.pkl',PATH_TO_SHR)
+                try:
+                    if (pkl_name[0] == 'Share/target.pkl'):
+                        print(pkl_name)
+                        pkl_file = open(pkl_name[0],'rb')
+                        ini_dict = pickle.load(pkl_file)
+                        break
+                except:
+                    continue
+                time.sleep(0.5)
+            
+            out_dict = ini_dict
+            print(out_dict)
+            pkl_file.close()
+            os.remove(pkl_name[0])
+            print('Finish Detection ......')
+            plot_image_box_label(frameL,out_dict)
+            key = cv2.waitKey(0) & 0xFF
+            while True:
+                if (obj_name in out_dict and len(out_dict[obj_name])>0):
+                    print('Detection Success ......')
+                    cv2.destroyAllWindows()
+                    cap_det = True
+                    break
+                else:
+                    cv2.destroyAllWindows()
+                    try_time = try_time + 1
+                    print('Failed')
+                    break
+
+        #Tracking
+        # setup initial location of window
+        track_window = ExtractROI(obj_name,out_dict)
+        c,r,w,h      = [int(track_window[v]) for v in range(4)]
+        track_window = tuple([c,r,w,h])
+        track_loop   = 1
+        print(track_window)
+
+        # set up the ROI for tracking
+        roi = frameL[r:r+h, c:c+w]
+        hsv_roi =  cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv_roi, np.array((0., 60.,32.)), np.array((180.,255.,255.)))
+        roi_hist = cv2.calcHist([hsv_roi],[0],mask,[180],[0,180])
+        cv2.normalize(roi_hist,roi_hist,0,255,cv2.NORM_MINMAX)
+        # Setup the termination criteria, either 10 iteration or move by atleast 1 pt
+        term_crit = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1 )
+        rot_num   = 1
+        send_msg_ok = 1
+        msg_count = 25
+        while(1):
+            pts_vec = np.zeros([4,2])
+            for i in range(track_loop):
+                ret, frameL = camL.read()
+                if ret == True:
+                    hsv = cv2.cvtColor(frameL, cv2.COLOR_BGR2HSV)
+                    dst = cv2.calcBackProject([hsv],[0],roi_hist,[0,180],1)
+                    # apply meanshift to get the new location
+                    ret, track_window = cv2.CamShift(dst, track_window, term_crit)
+                    pts = cv2.boxPoints(ret)
+                    pts_vec = pts_vec+pts
+                    #print('pts',pts)
+                else:
+                    break
+            # Draw it on imagep
+            pts = pts_vec/track_loop
+            pts = np.int0(pts)
+            # img2 = cv2.polylines(frame,[pts],True, 255,2)
+            # Draw central points
+            cpts = (int(pts[:,0].mean()),int(pts[:,1].mean()))
+            #print(cpts)
+            #exit()
+            img2 = cv2.circle(frameL,cpts,10,255,-1)
+            if (cpts[0] < cols/2-20):
+                cv2.putText(img2, 'left',cpts,cv2.FONT_HERSHEY_SIMPLEX,1,(125, 255, 51), 2, cv2.LINE_AA)
+                if (msg_count == 30 and send_msg_ok==1):
+                    print('cpts[0]',cpts[0])
+                    print(cols/2)
+                    send2uno('l',rot_num)
+                    msg_count = 0
+                    if (rot_num == 9):
+                        rot_num = 4
+                    else:
+                        rot_num = rot_num+1
+            elif (cpts[0] > cols/2+20):
+                cv2.putText(img2, 'right',cpts,cv2.FONT_HERSHEY_SIMPLEX,1,(125, 255, 51), 2, cv2.LINE_AA)
+                if (msg_count == 30 and send_msg_ok==1):
+                    print('cpts[0]',cpts[0])
+                    print(cols/2)
+                    send2uno('r',rot_num)
+                    msg_count = 0
+                    if (rot_num == 9):
+                        rot_num = 4
+                    else:
+                        rot_num = rot_num+1
+            else:
+                cv2.putText(img2, 'center',cpts,cv2.FONT_HERSHEY_SIMPLEX,1,(125, 255, 51), 2, cv2.LINE_AA)
+                if (msg_count == 30 and send_msg_ok==1):
+                    send2uno('c',0)
+                    send2uno('b',0)
+                    send_msg_ok = 0
+                    break
+            msg_count = msg_count + 1
+            cv2.imshow(windowNameL, img2)
+            k = cv2.waitKey(10) & 0xff
+            if k == 27:
+                break
     
 cv2.destroyAllWindows()
 capL.release()
