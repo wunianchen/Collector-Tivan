@@ -118,7 +118,7 @@ termination_criteria_subpix = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITE
 
 patternX = 7;
 patternY = 7;
-square_size_in_mm = 21.8;
+square_size_in_mm = 33;
 
 # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
 
@@ -138,21 +138,29 @@ print()
 print("--> hold up chessboard")
 
 while (not(do_calibration)):
+        while 1:
+                # grab frames from camera (to ensure best time sync.)
 
-        # grab frames from camera (to ensure best time sync.)
+                camL.grab();
+                camR.grab();
 
-        camL.grab();
-        camR.grab();
+                # then retrieve the images in slow(er) time
+                # (do not be tempted to use read() !)
 
-        # then retrieve the images in slow(er) time
-        # (do not be tempted to use read() !)
+                retR, frameL = camL.retrieve();
+                retL, frameR = camR.retrieve();
+                
+                frameL = cv2.resize(frameL, (640, 480))
+                frameR = cv2.resize(frameR, (640, 480))
 
-        retR, frameL = camL.retrieve();
-        retL, frameR = camR.retrieve();
-        
-        frameL = cv2.resize(frameL, (640, 480))
-        frameR = cv2.resize(frameR, (640, 480))
-        
+                cv2.imshow(windowNameL,frameL);
+                cv2.imshow(windowNameR,frameR);
+                key = cv2.waitKey(100) & 0xFF; # wait 500ms between frames
+                if (key == ord('a')):
+                        break
+                elif (key == ord('x')):
+                        do_calibration = True;
+                        break
         
 
         # convert to grayscale
@@ -172,16 +180,11 @@ while (not(do_calibration)):
 
             chessboard_pattern_detections += 1;
 
-            # add object points to global list
-
-            objpoints.append(objp);
 
             # refine corner locations to sub-pixel accuracy and then
 
             corners_sp_L = cv2.cornerSubPix(grayL,cornersL,(11,11),(-1,-1),termination_criteria_subpix);
-            imgpointsL.append(corners_sp_L);
             corners_sp_R = cv2.cornerSubPix(grayR,cornersR,(11,11),(-1,-1),termination_criteria_subpix);
-            imgpointsR.append(corners_sp_R);
 
             # Draw and display the corners
 
@@ -193,6 +196,15 @@ while (not(do_calibration)):
 
             cv2.imshow(windowNameL,drawboardL);
             cv2.imshow(windowNameR,drawboardR);
+            key = cv2.waitKey(0)
+            if (key == ord('y')):
+                # add object points to global list
+            
+                objpoints.append(objp);
+                imgpointsL.append(corners_sp_L);
+                imgpointsR.append(corners_sp_R);
+            elif (key == ord('n')):
+                continue
         else:
             text = 'detected: ' + str(chessboard_pattern_detections);
             cv2.putText(frameL, text, (10,25), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, 8);
@@ -203,7 +215,7 @@ while (not(do_calibration)):
         # start the event loop
 
         key = cv2.waitKey(100) & 0xFF; # wait 500ms between frames
-        if (key == ord('c')):
+        if (key == ord('x')):
             do_calibration = True;
 
 # perform calibration on both cameras - uses [Zhang, 2000]
