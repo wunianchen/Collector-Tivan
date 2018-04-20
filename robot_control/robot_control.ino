@@ -59,9 +59,8 @@ char last_data_byte = 'x';
 bool received_flag = false;                                                          // waiting the result from CV. TODO: redefine this.
 bool rotate_by_sensor = false;                                                             // when the flag is true, keep doing accurate rotate by sensor
 bool judge_next = false;                                                                // used in accurate rotate by sensor to decide when rotate stop
-bool judge_third = false;
-//double rotate_seq[] = {45, 22.5, 11.25, 5.625, 5.625, 5.625, 5.625, 5.625, 5.625};      // define the robot rotate degree sequence by using tracking algorithm
-//double rotate_seq[] = {20, 15, 7.5, 3.75, 1.875, 1.875, 1.875, 1.875, 1.875, 1.875};
+
+// define the robot rotate degree sequence by using tracking algorithm
 double rotate_seq[] = {10, 8, 5, 3, 1.875, 1.875, 1.875, 1.875, 1.875, 1.875};
 double rotate_det[] = {30,-60};
 double rotate_bac[] = {10, 10, 10, 10, 8, 8, 8, 8, 8, 8};
@@ -132,7 +131,6 @@ void loop() {
     received_flag = false;
   }
  
-
   //back detection rotate
   if(ctrl_byte == 'm' && received_flag == true)
   {
@@ -152,12 +150,6 @@ void loop() {
   // 1. angle adjustment by tracking
   if((ctrl_byte == 'l' || ctrl_byte == 'r' || ctrl_byte == 'c' || ctrl_byte == 'e') && (last_data_byte != data_byte) && received_flag == true )
   {
-    //Serial.println("step1");
-    //Serial.print("Last Angle:");
-    //Serial.println(last_data_byte);
-    //Serial.print("Current Angle:");
-    //Serial.println(data_byte);
-     
     last_data_byte = data_byte;
     
     if(ctrl_byte == 'l')
@@ -232,30 +224,6 @@ void loop() {
     delay(1000);
     robot_rotate(-180);
   } 
-  
-/*
-  //lox.rangingTest(&VL53L0x_measure, false);               // pass in "true" to get debug data printout    
-  //current_dist_measure = VL53L0x_measure.RangeMilliMeter;
-  //Serial.print("CURRENT MEASURE:");
-  //Serial.println(current_dist_measure);
-  //delay(5000);
-  // robot calibration
-  if(temp==1)
-  {
-    //robot_sensor_rotate();
-    //robot_rotate(360);
-    //robot_mov(1,15); 
-    //robot_forward(100);
-    robot_mov(3,0);
-    //robot_mov(4,0);
-    //grab_servo.write(SERVO_GRAB_POS);   
-    //robot_mov(3,0);                  
-    temp = 0;
-  }
- */
-
-  
-
 }
 
 // Receive data from I2C
@@ -266,16 +234,12 @@ void receiveData(int byteCount)
     {
       ctrl_byte = Wire.read();
       i++;
-      //Serial.print("READ ctrl_byte:");
-      //Serial.println(ctrl_byte);
     }
     else if(i == 1)
     {
       data_byte = Wire.read();
       i--;
       received_flag = true;  
-      //Serial.print("READ data_byte:");
-      //Serial.println(data_byte);
     }
   }
 }  
@@ -291,11 +255,6 @@ void robot_rotate(double angle_degree)
       L_Motor -> setSpeed(ROT_SPEED);
       R_Motor -> setSpeed(ROT_SPEED);
       double delay_time = ((angle_degree/360) * DELAY_PER_CYCLE);
-      //Serial.print("angle degree is:");
-      //Serial.println(angle_degree);
-      //Serial.print("Delay Time is:");
-      //Serial.println(delay_time);
-      //Serial.println("****************");
       delay(delay_time);
       robot_stop();
     }
@@ -309,11 +268,6 @@ void robot_rotate(double angle_degree)
       L_Motor -> setSpeed(ROT_SPEED);
       R_Motor -> setSpeed(ROT_SPEED);
       double delay_time = abs((angle_degree/360) * DELAY_PER_CYCLE);
-      //Serial.print("angle degree is:");
-      //Serial.println(angle_degree);
-      //Serial.print("Delay Time is:");
-      //Serial.println(delay_time);
-      //Serial.println("****************");
       delay(delay_time);
       robot_stop();
     }
@@ -354,7 +308,6 @@ void robot_forward(int distance)
   R_Motor -> setSpeed(F_SPEED_R);
   double delay_t = double(distance) / 38 *2000;
   delay(delay_t);//38cm --> 2000ms
-  //delay(2000);
   robot_stop();
 }
 
@@ -367,13 +320,6 @@ void robot_sensor_rotate()
   { 
     lox.rangingTest(&VL53L0x_measure, false);               // pass in "true" to get debug data printout    
     current_dist_measure = VL53L0x_measure.RangeMilliMeter;
-    
-    //Serial.print("LAST MEASURE:");
-    //Serial.println(last_dist_measure);
-    //Serial.print("CURRENT MEASURE:");
-    //Serial.println(current_dist_measure);
-    //delay(1000);
-
     if(judge_next)
     {
       if((current_dist_measure > last_dist_measure))
@@ -404,8 +350,8 @@ void robot_forward_and_grab()
 
     if(VL53L0x_measure.RangeStatus !=4)
     {
-      Serial.print("Distance (mm):");
-      Serial.println(VL53L0x_measure.RangeMilliMeter);  
+      //Serial.print("Distance (mm):");
+      //Serial.println(VL53L0x_measure.RangeMilliMeter);  
     }
     else
     {
